@@ -1,4 +1,5 @@
 [data-component='ConsolePage'] {
+  background-color: #fff;
   font-family: 'Roboto Mono', monospace;
   font-weight: 400;
   font-style: normal;
@@ -25,12 +26,18 @@
       flex-grow: 1;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      font-weight: bold; 
+      font-size:1.6em;
+      color: #101010;
       img {
-        width: 24px;
-        height: 24px;
+        width: 120px;
+        height: 30px;
       }
     }
+    .content-api-key {
+      visibility: hidden;
+    }    
   }
 
   .content-main {
@@ -51,6 +58,7 @@
         padding-top: 16px;
         padding-bottom: 4px;
         position: relative;
+        font-size: small;
       }
       .content-block-body {
         color: #6e6e7f;
@@ -66,7 +74,7 @@
       }
     }
     .content-right {
-      width: 300px;
+      width: 400px;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
@@ -101,6 +109,7 @@
         }
       }
       & > div.kv {
+        visibility: hidden;
         height: 250px;
         max-height: 250px;
         white-space: pre;
@@ -138,12 +147,38 @@
         flex-shrink: 0;
         width: 100%;
         overflow: hidden;
-        height: 200px;
+        height: 400px;
         min-height: 0;
-        max-height: 200px;
+        max-height: 400px;
         border-top: 1px solid #e7e7e7;
       }
     }
+  }
+
+  .divider {
+    width: 1px; /* Width of the vertical line */
+    background-color: #e7e7e7; /* Color of the vertical line */
+    height: 100%; /* Full height of the container */
+    margin-left: 10px;
+    margin-right: -15px;
+  }
+
+  .highlightgreen {
+    font-weight: bold; 
+    color: lightgreen; /* Set the text color to red */
+  }  
+
+  .highlightred {
+    font-weight: bold; 
+    color: red; /* Set the text color to red */
+  }
+
+  .network-title {
+    flex-shrink: 0;
+    padding-top: 16px;
+    padding-bottom: 4px;
+    position: relative;
+    font-size: x-small;
   }
 
   .conversation-item {

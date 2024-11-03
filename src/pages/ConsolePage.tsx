@@ -16,10 +16,10 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { RealtimeClient } from '@openai/realtime-api-beta';
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
-import { instructions } from '../utils/conversation_config.js';
+import { instructions, additional_info } from '../utils/conversation_config.js';
 import { WavRenderer } from '../utils/wav_renderer';
 
-import { X, Edit, Zap, ArrowUp, ArrowDown } from 'react-feather';
+import { X, Edit, Zap, ArrowUp, ArrowDown, Play, Pause, Mic, MicOff } from 'react-feather';
 import { Button } from '../components/button/Button';
 import { Toggle } from '../components/toggle/Toggle';
 import { Map } from '../components/Map';
@@ -27,6 +27,7 @@ import { Map } from '../components/Map';
 import './ConsolePage.scss';
 import { isJsxOpeningLikeElement } from 'typescript';
 
+//import nodemailer from 'nodemailer';
 /**
  * Type for result from get_weather() function call
  */
@@ -124,6 +125,298 @@ export function ConsolePage() {
     lng: -122.418137,
   });
   const [marker, setMarker] = useState<Coordinates | null>(null);
+
+  //hanks - Implementation of audio copilot
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1.0); // State to control playback speed
+  const audioRef = useRef<HTMLAudioElement | null>(null);  
+  //const videoRef = useRef<HTMLVideoElement | null>(null);  
+
+  /*
+  // Create a transporter object
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: 'helloqianfeng@gmail.com', // Replace with your Gmail address
+      pass: 'mgmz zicm yjwp xumx', // Replace with your Gmail password or App Password
+    },
+  });
+
+  const sendEmail = async (title: string, content: string, to: string) => {
+    try {
+      await transporter.sendMail({
+        from: 'helloqianfeng@gmail.com', // Replace with your Gmail address
+        to: to, // Receiver's email
+        subject: title, // Subject line
+        text: content, // Plain text body
+        html: `<p>${content}</p>`, // HTML body
+      });
+      console.log('Email sent successfully');
+    } catch (error) {
+      console.error('Error sending email:', error);
+    }
+  };*/
+
+  useEffect(() => {
+    audioRef.current = new Audio('./audio/ck_interview.mp3');
+    //audioRef.current = new Audio('./audio/sap_news_jack.wav');
+    //audioRef.current = new Audio('./audio/sap_new_notbooklm.wav');
+
+    //audioRef.current.onplay
+    //videoRef.current = new Video('./video/ck_interview.mp4');
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+    };    
+  }, []);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate; // Set the playback speed
+    }
+  }, [playbackRate]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updateProgress = () => {
+      if (audio.duration) {
+        setProgress((audio.currentTime / audio.duration) * 100);
+      }
+    };
+
+    audio.addEventListener('timeupdate', updateProgress);
+
+    return () => {
+      audio.removeEventListener('timeupdate', updateProgress);
+    };
+  }, []);  
+
+  const toggleAudio = async () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        //audio should be paused when User speaks or LLM speaks
+        audioRef.current.pause();
+      } else {
+        try {
+          //start playing or resuming audio
+          audioRef.current.play();
+        } catch (error) {
+          console.error('Error playing audio:', error);
+        }
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  /**
+   * Utility for search news by google
+   */
+  async function performGoogleSearch(query: string): Promise<Array<{ title: string, url: string }>> {
+    try {
+      const response: Response = await fetch(`http://localhost:3001/api/news?q=${encodeURIComponent(query)}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const results: any = await response.json();
+      console.log('Search results:', results);
+
+      return results.map((item: any): { title: any; url: any } => ({
+        title: item.title,
+        url: item.link
+      }));
+    } catch (error) {
+      console.error('Error in performGoogleSearch:', error);
+      return [
+        {
+          title: '',
+          url: ''
+        }
+      ];
+    }
+  }  
+
+  const toggleMuteRecording = async () => {
+    if (wavRecorderRef.current && clientRef.current) {
+      if (isMuted) {
+        await unmuteRecording();
+      } else {
+        await muteRecording();
+      }
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const unmuteRecording = async () => {
+    setIsMuted(false);
+    const wavRecorder = wavRecorderRef.current;
+    const client = clientRef.current;
+    await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+  };    
+
+  const muteRecording = async () => {
+    setIsMuted(true);
+    const wavRecorder = wavRecorderRef.current;
+    await wavRecorder.pause();
+  };    
+
+  /**
+   * Switch between Audio Copilot On/Off
+   */  
+  const switchAudioCopilot = async (value: string) => {
+    
+    const client = clientRef.current;
+    
+    if(client.isConnected()) {  
+      if(value === 'none') {
+        await switchAudioCopilotOff();
+      } else {
+        await switchAudioCopilotOn();
+      }
+    }
+    else{
+      if(value === 'server_vad'){
+        await switchAudioCopilotOn();
+      }
+    }    
+  };
+
+  /**
+     * Switch to Audio Copilot On
+     */
+  const switchAudioCopilotOn = useCallback(async () => {
+    const client = clientRef.current;
+    const wavRecorder = wavRecorderRef.current;
+    const wavStreamPlayer = wavStreamPlayerRef.current;
+
+    // Set state variables
+    startTimeRef.current = new Date().toISOString();
+    setRealtimeEvents(realtimeEvents);
+    //setItems(client.conversation.getItems());
+    setItems(items);
+
+    // Connect to microphone
+    await wavRecorder.begin();
+
+    // Connect to audio output
+    // Enhanced with one parameter to resume playback when reply speek is finished
+    await wavStreamPlayer.connect(audioRef.current, setIsPlaying);
+    wavStreamPlayer.askStop = true;
+
+    // Connect to realtime API
+    await client.connect();
+    client.sendUserMessageContent([
+      {
+        type: `input_text`,
+        text: `Hello!`,
+        // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+      },
+    ]);    
+    setIsConnected(true);
+
+    if (client.getTurnDetectionType() === 'server_vad') {
+      //await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+
+      // Test new feature - Capture audio from other apps 
+      /*
+      const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true });
+      const audioContext = new AudioContext({ sampleRate: 44100 });
+      const source = audioContext.createMediaStreamSource(stream);
+  
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+  
+      processor.onaudioprocess = (audioEvent) => {
+          const float32Data = audioEvent.inputBuffer.getChannelData(0);
+          const pcm16Data = new Int16Array(float32Data.length);
+  
+          // Convert Float32 to PCM16
+          for (let i = 0; i < float32Data.length; i++) {
+              let s = Math.max(-1, Math.min(1, float32Data[i]));
+              pcm16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          }
+          
+          client.appendInputAudio(pcm16Data);
+
+          // pcm16Data now contains the PCM16 audio data
+          console.log(pcm16Data);
+          // You can now send pcm16Data to a server, save to file, etc.
+      }; */         
+      // Test new feature - Capture audio from other apps
+      
+    }
+
+    // mute recording by default when copilot is turned on
+    await muteRecording();
+  }, []);
+    
+  /**
+   * switch to Audio Copilot Off
+   */
+  const switchAudioCopilotOff = useCallback(async () => {
+    setIsConnected(false);
+    //setRealtimeEvents([]);
+    //setItems([]);
+    setMemoryKv({});
+    setCoords({
+      lat: 37.775593,
+      lng: -122.418137,
+    });
+    setMarker(null);
+
+    const client = clientRef.current;
+    client.disconnect();
+
+    const wavRecorder = wavRecorderRef.current;
+    await wavRecorder.end();
+
+    const wavStreamPlayer = wavStreamPlayerRef.current;
+    await wavStreamPlayer.interrupt();   
+
+  }, []);
+
+  /**
+   * Capture audio from other apps, e.g. Microsoft Teams, 
+   * This could be a new feature for Audio Copilot to prepare an reference answer when user is 
+   * in an interview or in a customer-facing issue resolution.
+   */
+  async function captureAudioToPCM16() {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true });
+    const audioContext = new AudioContext();
+    const source = audioContext.createMediaStreamSource(stream);
+
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+
+    processor.onaudioprocess = (audioEvent) => {
+        const float32Data = audioEvent.inputBuffer.getChannelData(0);
+        const pcm16Data = new Int16Array(float32Data.length);
+
+        // Convert Float32 to PCM16
+        for (let i = 0; i < float32Data.length; i++) {
+            let s = Math.max(-1, Math.min(1, float32Data[i]));
+            pcm16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+
+        // pcm16Data now contains the PCM16 audio data
+        console.log(pcm16Data);
+        // You can now send pcm16Data to a server, save to file, etc.
+    };
+}
+
+//captureAudioToPCM16();
+
+
+  //hanks
 
   /**
    * Utility for formatting the timing of logs
@@ -381,6 +674,10 @@ export function ConsolePage() {
     // Set transcription, otherwise we don't get user transcriptions back
     client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
 
+    // hanks - Set turn detection to server VAD by default
+    client.updateSession({ turn_detection: { type: 'server_vad' } });    
+    // hanks
+
     // Add tools
     client.addTool(
       {
@@ -454,6 +751,214 @@ export function ConsolePage() {
         return json;
       }
     );
+    // hanks - Capabilities of Aduio Copilot
+    client.addTool(
+      { //Capabilities demo: when a listener wants to ask for a google search
+        name: 'google_search',
+        description:
+          'Performs a Google News search and returns the top 2 results.',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'The search query to be used.',
+            },           
+          },
+          required: ['query'],
+        },
+      },
+      async({ query }: { query: string }) => {
+        return await performGoogleSearch(query);
+      }
+    );    
+    client.addTool(
+      { //Capabilities demo: to retrieve the latest stock for a given company
+        //e.g. get_stock_price(company: 'SAP') when valuation of SAP is heard, 
+        //user is just a tiny SAP stock holder and want to check the latest SAP stock prcie 
+        name: 'get_stock_price',
+        description:
+          'Retrieves the latest stock price for a given comppany. ',
+        parameters: {
+          type: 'object',
+          properties: {
+            company: {
+              type: 'string',
+              description: 'Name of the company',
+            },
+          },
+          required: ['company'],
+        },
+      },
+      async ({ company }: { [key: string]: any }) => {
+        /*
+        const result = await fetch(
+          `https://api.openai.com/v1/stock_price?company=${company}`
+        );*/
+        const result = {
+          ok: true,
+          date: '2024-10-25',
+          company: 'SAP',
+          price: 237.69,
+          currency: 'USD',
+        };
+        //const json = await result.json();
+        return result;
+      }
+    );
+    client.addTool(
+      { //Voice commands to control the on-going playbac, e,g. pause, resume, speed up, speed down, 
+        //skip forward, skip backward, volume up, volume down, peek the current time of the audio
+        name: 'audio_control',
+        description:
+          'Voice control the on-going playback. e.g. stop the audio, speed up or down the audio',
+        parameters: {
+          type: 'object',
+          properties: {
+            context: {
+              type: 'string',
+              description: 'additional information to control the audio',
+            },
+            command: {
+              type: 'string',
+              description: 'commoand to control the audio',
+            },
+          },
+          required: ['context', 'command'],
+        },
+      },
+      async ({ context, command }: { [key: string]: any }) => {
+        //const audio = audioRef.current;
+        const wavStreamPlayer = wavStreamPlayerRef.current;
+
+        wavStreamPlayer.askStop = false;
+
+        if (command === 'pause') {
+          wavStreamPlayer.askStop = true;
+        } else if (command === 'resume') {
+          wavStreamPlayer.askStop = false;
+        } else if (command === 'speed') {
+          if (context === 'up') {
+            setPlaybackRate(playbackRate + 0.25);
+          } else if (context === 'down') {
+            setPlaybackRate(playbackRate - 0.25);
+          } else if (context === 'normal') {
+            setPlaybackRate(1.0);
+          }
+        } else if (command === 'skip') {  
+          if ( audioRef.current ) {
+            if (context === 'forward') {
+              audioRef.current.currentTime += 10;
+            } else if (context === 'backward') {
+              audioRef.current.currentTime -= 10;
+              if (audioRef.current.currentTime < 0) {
+                audioRef.current.currentTime = 0;
+              }
+            } else if ( context == 'start') {
+              audioRef.current.currentTime = 0;
+            }
+          }
+        } else if ( command === 'volume') {
+          if (audioRef.current) {
+            if (context === 'up') {
+              audioRef.current.volume = Math.min(audioRef.current.volume + 0.1, 1.0);
+            } else if (context === 'down') {
+              audioRef.current.volume = Math.max(audioRef.current.volume - 0.5, 0.0);
+            }
+          }          
+        } else if ( command === 'peek') {  
+          if (audioRef.current) {
+            return { ok: true, currentTime: audioRef.current.currentTime, duration: audioRef.current.duration };
+          }
+          
+        }  
+        return { ok: true };
+      }
+    );        
+    client.addTool(
+      { //Jury's feedback: What if it could interpret what Copilot hear into local language in realtime? 
+        //e.g. Copilot hears English, and translate it into Chinese in realtime
+        //This helps listners to consume the audio in the local language
+        name: 'translation_current_sentence',
+        description:
+          'translate the current sentence to the target language, by default, it is Chinese if not specified target language',
+        parameters: {
+          type: 'object',
+          properties: {
+            target_lan: {
+              type: 'string',
+              description: 'target language',
+            },
+          },          
+        },
+      },
+      async ({ target_lan }: { [key: string]: any }) => {
+        if ( audioRef.current ) {
+          if (target_lan === null) {
+            return { ok: true, target_lan: 'zh', currentTime: audioRef.current.currentTime, duration: audioRef.current.duration};
+          } else {
+            return { ok: true, target_lan: target_lan, currentTime: audioRef.current.currentTime, duration: audioRef.current.duration  };
+          }
+        } else {
+          return { ok: false, info: 'No audio file is playing' };
+        }
+        
+      }
+    );    
+    client.addTool(
+      { //Capabilities demo: when a lister wants to provide feedback
+        // or similarly, sharing it to a friend...
+        name: 'feedback_collection',
+        description:
+          'Collect feedback from the user. e.g. feedback on the company AI first strategy...',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              description: 'feedback title',
+            },
+            content: {
+              type: 'string',
+              description: 'feedback content',
+            },
+          },
+          required: ['title', 'content'],
+        },
+      },
+      async ({ title, content }: { [key: string]: any }) => {
+        return { ok: true, info: 'Thanks for your feedback' };
+      }
+    );
+    client.addTool(
+      { //Capabilities demo: when a lister wants to send a mail to a friend
+        name: 'send_mail',
+        description:
+          'help the user to send the mail to a specific Recipient',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              description: 'feedback title',
+            },
+            content: {
+              type: 'string',
+              description: 'feedback content',
+            },
+            to: {
+              type: 'string',
+              description: 'mail receiver',
+            },            
+          },
+          required: ['query'],
+        },
+      },
+      async ({ title, content }: { [key: string]: any }) => {
+        return { ok: true, info: 'Thanks for mail' };
+      }
+    );
+    // hanks
 
     // handle realtime events from client + server for event logging
     client.on('realtime.event', (realtimeEvent: RealtimeEvent) => {
@@ -474,9 +979,13 @@ export function ConsolePage() {
       if (trackSampleOffset?.trackId) {
         const { trackId, offset } = trackSampleOffset;
         await client.cancelResponse(trackId, offset);
-      }
+      }  
     });
     client.on('conversation.updated', async ({ item, delta }: any) => {
+      // hanks - Resume audio when item is 'completed'
+      wavStreamPlayer.setItemStatus(item.status);
+      // hanks 
+
       const items = client.conversation.getItems();
       if (delta?.audio) {
         wavStreamPlayer.add16BitPCM(delta.audio, item.id);
@@ -491,6 +1000,15 @@ export function ConsolePage() {
       }
       setItems(items);
     });
+
+    // hanks - Pause audio file playing when speech is detected
+    client.realtime.on('server.input_audio_buffer.speech_started', () => {
+      if (audioRef.current){
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }      
+    });
+    // hanks
 
     setItems(client.conversation.getItems());
 
@@ -507,8 +1025,8 @@ export function ConsolePage() {
     <div data-component="ConsolePage">
       <div className="content-top">
         <div className="content-title">
-          <img src="/openai-logomark.svg" />
-          <span>realtime console</span>
+          <img src="/resource/great_developer.jpg" />
+          <span>An <span>Audio Copilot</span> Empowered by LLM</span>
         </div>
         <div className="content-api-key">
           {!LOCAL_RELAY_SERVER_URL && (
@@ -524,6 +1042,118 @@ export function ConsolePage() {
       </div>
       <div className="content-main">
         <div className="content-logs">
+          <div className="content-block conversation">
+            <div className="content-block-title">
+              {isConnected ? (
+                <>
+                  Audio Copilot Status: <span className="highlightgreen">On</span>
+                </>
+              ) : (
+                <>
+                  Audio Copilot Status: <span className="highlightred">Off</span>
+                </>
+              )}
+            </div>
+            <div className="content-block-body" data-conversation-content>
+              {items.map((conversationItem, i) => {
+                return (
+                  <div className="conversation-item" key={conversationItem.id}>
+                    <div className={`speaker ${conversationItem.role || ''}`}>
+                      <div>
+                        {(
+                          conversationItem.role || conversationItem.type
+                        ).replaceAll('_', ' ')}
+                      </div>
+                      <div
+                        className="close"
+                        onClick={() =>
+                          deleteConversationItem(conversationItem.id)
+                        }
+                      >
+                        <X />
+                      </div>
+                    </div>
+                    <div className={`speaker-content`}>
+                      {/* tool response */}
+                      {conversationItem.type === 'function_call_output' && (
+                        <div>{conversationItem.formatted.output}</div>
+                      )}
+                      {/* tool call */}
+                      {!!conversationItem.formatted.tool && (
+                        <div>
+                          {conversationItem.formatted.tool.name}(
+                          {conversationItem.formatted.tool.arguments})
+                        </div>
+                      )}
+                      {!conversationItem.formatted.tool &&
+                        conversationItem.role === 'user' && (
+                          <div>
+                            {conversationItem.formatted.transcript ||
+                              (conversationItem.formatted.audio?.length
+                                ? '(awaiting transcript)'
+                                : conversationItem.formatted.text ||
+                                  '(item sent)')}
+                          </div>
+                        )}
+                      {!conversationItem.formatted.tool &&
+                        conversationItem.role === 'assistant' && (
+                          <div>
+                            {conversationItem.formatted.transcript ||
+                              conversationItem.formatted.text ||
+                              '(truncated)'}
+                          </div>
+                        )}
+                      {conversationItem.formatted.file && (
+                        <audio
+                          src={conversationItem.formatted.file.url}
+                          controls
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>          
+          <div className="content-actions">
+          <Button
+              label={isPlaying ? 'Pause' : 'Play\u00A0'}
+              iconPosition={'start'}
+              icon={isPlaying ? Pause : Play}
+              buttonStyle={'regular'}
+              onClick={
+                isPlaying ? toggleAudio : toggleAudio
+              }
+            />            
+            <div className='spacer' />
+            <div style={{ width: '63%', backgroundColor: '#ccc', height: '10px', borderRadius: '10px', marginTop: '10px', marginLeft: '-32px' }}>
+              <div
+                style={{
+                  width: `${progress}%`,
+                  backgroundColor: '#007bff',
+                  height: '10px',
+                  borderRadius: '10px',
+                }}
+              />
+            </div>
+            <div className="spacer" />            
+            <Toggle
+              defaultValue={false}
+              labels={['\u00A0', 'Audio Copilot']}
+              values={['none', 'server_vad']}
+              onChange={(_, value) => switchAudioCopilot(value)}
+            />
+            <Button
+                label={isMuted ? '' : ''}
+                iconPosition={'start'}
+                icon={isMuted ? MicOff : Mic}
+                disabled={!isConnected}
+                buttonStyle={'regular'}
+                onClick={
+                  isMuted ? toggleMuteRecording : toggleMuteRecording
+                }
+              />                       
+          </div>          
           <div className="content-block events">
             <div className="visualization">
               <div className="visualization-entry client">
@@ -533,9 +1163,9 @@ export function ConsolePage() {
                 <canvas ref={serverCanvasRef} />
               </div>
             </div>
-            <div className="content-block-title">events</div>
+            <div className="network-title">Network Activities</div>
             <div className="content-block-body" ref={eventsScrollRef}>
-              {!realtimeEvents.length && `awaiting connection...`}
+              {!realtimeEvents.length && `Copilot awaiting turned on...`}
               {realtimeEvents.map((realtimeEvent, i) => {
                 const count = realtimeEvent.count;
                 const event = { ...realtimeEvent.event };
@@ -597,126 +1227,12 @@ export function ConsolePage() {
                 );
               })}
             </div>
-          </div>
-          <div className="content-block conversation">
-            <div className="content-block-title">conversation</div>
-            <div className="content-block-body" data-conversation-content>
-              {!items.length && `awaiting connection...`}
-              {items.map((conversationItem, i) => {
-                return (
-                  <div className="conversation-item" key={conversationItem.id}>
-                    <div className={`speaker ${conversationItem.role || ''}`}>
-                      <div>
-                        {(
-                          conversationItem.role || conversationItem.type
-                        ).replaceAll('_', ' ')}
-                      </div>
-                      <div
-                        className="close"
-                        onClick={() =>
-                          deleteConversationItem(conversationItem.id)
-                        }
-                      >
-                        <X />
-                      </div>
-                    </div>
-                    <div className={`speaker-content`}>
-                      {/* tool response */}
-                      {conversationItem.type === 'function_call_output' && (
-                        <div>{conversationItem.formatted.output}</div>
-                      )}
-                      {/* tool call */}
-                      {!!conversationItem.formatted.tool && (
-                        <div>
-                          {conversationItem.formatted.tool.name}(
-                          {conversationItem.formatted.tool.arguments})
-                        </div>
-                      )}
-                      {!conversationItem.formatted.tool &&
-                        conversationItem.role === 'user' && (
-                          <div>
-                            {conversationItem.formatted.transcript ||
-                              (conversationItem.formatted.audio?.length
-                                ? '(awaiting transcript)'
-                                : conversationItem.formatted.text ||
-                                  '(item sent)')}
-                          </div>
-                        )}
-                      {!conversationItem.formatted.tool &&
-                        conversationItem.role === 'assistant' && (
-                          <div>
-                            {conversationItem.formatted.transcript ||
-                              conversationItem.formatted.text ||
-                              '(truncated)'}
-                          </div>
-                        )}
-                      {conversationItem.formatted.file && (
-                        <audio
-                          src={conversationItem.formatted.file.url}
-                          controls
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="content-actions">
-            <Toggle
-              defaultValue={false}
-              labels={['manual', 'vad']}
-              values={['none', 'server_vad']}
-              onChange={(_, value) => changeTurnEndType(value)}
-            />
-            <div className="spacer" />
-            {isConnected && canPushToTalk && (
-              <Button
-                label={isRecording ? 'release to send' : 'push to talk'}
-                buttonStyle={isRecording ? 'alert' : 'regular'}
-                disabled={!isConnected || !canPushToTalk}
-                onMouseDown={startRecording}
-                onMouseUp={stopRecording}
-              />
-            )}
-            <div className="spacer" />
-            <Button
-              label={isConnected ? 'disconnect' : 'connect'}
-              iconPosition={isConnected ? 'end' : 'start'}
-              icon={isConnected ? X : Zap}
-              buttonStyle={isConnected ? 'regular' : 'action'}
-              onClick={
-                isConnected ? disconnectConversation : connectConversation
-              }
-            />
-          </div>
+          </div>          
         </div>
+        <div className="divider"></div>
         <div className="content-right">
           <div className="content-block map">
-            <div className="content-block-title">get_weather()</div>
-            <div className="content-block-title bottom">
-              {marker?.location || 'not yet retrieved'}
-              {!!marker?.temperature && (
-                <>
-                  <br />
-                  🌡️ {marker.temperature.value} {marker.temperature.units}
-                </>
-              )}
-              {!!marker?.wind_speed && (
-                <>
-                  {' '}
-                  🍃 {marker.wind_speed.value} {marker.wind_speed.units}
-                </>
-              )}
-            </div>
-            <div className="content-block-body full">
-              {coords && (
-                <Map
-                  center={[coords.lat, coords.lng]}
-                  location={coords.location}
-                />
-              )}
-            </div>
+            <div dangerouslySetInnerHTML={{ __html: additional_info }} />
           </div>
           <div className="content-block kv">
             <div className="content-block-title">set_memory()</div>

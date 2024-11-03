@@ -19,13 +19,29 @@ export class WavStreamPlayer {
     this.analyser = null;
     this.trackSampleOffsets = {};
     this.interruptedTrackIds = {};
+
+    // hanks - control audio playback
+    this.newsAudio = null;
+    this.setIsPlaying = null;
+    this.itemStatus = null;
+    this.askStop = false;
+    this.gainNode = null;
+    // hanks
   }
+
+  /** hanks
+   * set the status of the item to determine whether the last chunk has been added
+   */  
+  setItemStatus(itemStatus) {
+    this.itemStatus = itemStatus;
+  }
+  // hanks
 
   /**
    * Connects the audio context and enables output to speakers
    * @returns {Promise<true>}
    */
-  async connect() {
+  async connect(newsAudio, setIsPlaying) {
     this.context = new AudioContext({ sampleRate: this.sampleRate });
     if (this.context.state === 'suspended') {
       await this.context.resume();
@@ -40,6 +56,12 @@ export class WavStreamPlayer {
     analyser.fftSize = 8192;
     analyser.smoothingTimeConstant = 0.1;
     this.analyser = analyser;
+    // hanks - 
+    this.newsAudio = newsAudio;
+    this.setIsPlaying = setIsPlaying;  
+    this.gainNode = this.context.createGain(); // Create gain node for volume control
+    this.gainNode.connect(this.context.destination); // Connect gain to output    
+    this.gainNode.gain.value = 0; // Set volume to -1: mute, 0: default, 1: max
     return true;
   }
 
@@ -76,6 +98,9 @@ export class WavStreamPlayer {
   _start() {
     const streamNode = new AudioWorkletNode(this.context, 'stream_processor');
     streamNode.connect(this.context.destination);
+    // hanks      
+    streamNode.connect(this.gainNode); // Connect gain to output to control the player volume
+    // hanks
     streamNode.port.onmessage = (e) => {
       const { event } = e.data;
       if (event === 'stop') {
@@ -85,6 +110,20 @@ export class WavStreamPlayer {
         const { requestId, trackId, offset } = e.data;
         const currentTime = offset / this.sampleRate;
         this.trackSampleOffsets[requestId] = { trackId, offset, currentTime };
+      } else if (event === 'stop_by_completion') {
+        // hanks
+        // 'stop_by_completion' will be triggered together with 'stop' for each delta chunk finished playing
+        // BUT, audio will be resumed only after item with 'completed' staus received after the last chunk 
+        if(this.itemStatus === 'completed' && this.newsAudio) {
+          if(this.askStop) {
+            this.newsAudio.pause();
+            //this.askStop = false;
+          } else {
+            this.newsAudio.play();
+            this.setIsPlaying(true);            
+          }
+        }
+        // hanks
       }
     };
     this.analyser.disconnect();

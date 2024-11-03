@@ -79,6 +79,9 @@ class StreamProcessor extends AudioWorkletProcessor {
       return true;
     } else if (this.hasStarted) {
       this.port.postMessage({ event: 'stop' });
+      // hanks - to resume the playback, a separate message should be sent to indicate 
+      // reply completed from real-time API
+      this.port.postMessage({ event: 'stop_by_completion' });
       return false;
     } else {
       return true;
