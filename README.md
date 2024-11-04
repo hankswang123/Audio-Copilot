@@ -8,6 +8,8 @@ Audio Copilot enables the interaction with content during playback on-going. It 
 
 This idea is implemented based on [OpenAI Realtime Console](https://github.com/openai/openai-realtime-console)
 
+<img src="/readme/audio-copilot.png" width="800" />
+
 # OpenAI Realtime Console
 
 The OpenAI Realtime Console is intended as an inspector and interactive API reference
