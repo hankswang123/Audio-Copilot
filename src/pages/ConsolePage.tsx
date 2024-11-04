@@ -312,18 +312,18 @@ export function ConsolePage() {
 
     // Connect to realtime API
     await client.connect();
+    /*
     client.sendUserMessageContent([
       {
         type: `input_text`,
         text: `Hello!`,
         // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
       },
-    ]);    
+    ]);    */
     setIsConnected(true);
 
     if (client.getTurnDetectionType() === 'server_vad') {
-      //await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-
+      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
       // Test new feature - Capture audio from other apps 
       /*
       const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true });
@@ -416,7 +416,7 @@ export function ConsolePage() {
 //captureAudioToPCM16();
 
 
-  //hanks
+//hanks
 
   /**
    * Utility for formatting the timing of logs
