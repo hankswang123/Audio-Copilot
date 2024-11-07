@@ -17,8 +17,59 @@
     flex-grow: 1;
   }
 
-  .content-top {
+  .caption-display {
     display: flex;
+    position: fixed;
+    bottom: 48px;
+    width: 100%;
+    text-align: center;
+    font-size: 2.5em;
+    background-color: rgba(0, 0, 0, 0.466);
+    z-index: 2000;
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+  }  
+
+  .hidden-button {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap; /* added line */
+    border: 0;
+    padding: 0;
+    margin: -1px;
+  }  
+
+  .audio-duration {
+    position: absolute;
+    top: -25px; /* Adjust as needed */
+    right: 0;
+    background-color: white;
+    color:  rgba(0, 0, 0, 0.7);
+    padding: 5px;
+    border-radius: 5px;
+    font-size: 0.9em;
+  }  
+
+  .button-row {
+    display: flex;
+    gap: 16px; /* Space between buttons */
+    align-items: center; /* Align items vertically in the center */    
+    position: fixed;
+    bottom: 0; /* Adjust this value to position the button row at the bottom */
+    width: 100%; /* Make it span the full width of the viewport */
+    background-color: white; /* Optional: Set a background color to make it stand out */
+    z-index: 1000; /* Ensure it appears above other content */
+    padding: 3px; /* Optional: Add some padding */
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
+  } 
+
+  .content-top {
+    //display: flex;
+    display: none;
     align-items: center;
     padding: 8px 16px;
     min-height: 40px;
@@ -44,7 +95,8 @@
     flex-grow: 1;
     flex-shrink: 1 !important;
     margin: 0px 16px;
-    display: flex;
+    //display: flex;
+    display: none;
     overflow: hidden;
     margin-bottom: 24px;
     .content-block {
@@ -143,7 +195,8 @@
         border-top: 1px solid #e7e7e7;
       }
       .conversation {
-        display: flex;
+        //display: flex;
+        display: none;
         flex-shrink: 0;
         width: 100%;
         overflow: hidden;
@@ -152,9 +205,39 @@
         max-height: 400px;
         border-top: 1px solid #e7e7e7;
       }
+      .conversation-display {
+        display: flex;
+        flex-shrink: 0;
+        width: 100%;
+        overflow: hidden;
+        height: 400px;
+        min-height: 0;
+        max-height: 400px;
+        border-top: 1px solid #e7e7e7;
+      }      
     }
   }
 
+  .video {
+        display: none;
+        flex-shrink: 0;
+        width: 100%;
+        overflow: hidden;
+        height: 400px;
+        min-height: 0;
+        max-height: 400px;
+        border-top: 1px solid #e7e7e7;
+  }
+  .video-display {
+    display: flex;
+    flex-shrink: 0;
+    width: 100%;
+    overflow: hidden;
+    height: 400px;
+    min-height: 0;
+    max-height: 400px;
+    border-top: 1px solid #e7e7e7;
+}
   .divider {
     width: 1px; /* Width of the vertical line */
     background-color: #e7e7e7; /* Color of the vertical line */

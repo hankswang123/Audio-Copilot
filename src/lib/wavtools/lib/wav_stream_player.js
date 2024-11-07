@@ -22,6 +22,8 @@ export class WavStreamPlayer {
 
     // hanks - control audio playback
     this.newsAudio = null;
+    this.newsVideo = null;
+    this.isHidden = true;
     this.setIsPlaying = null;
     this.itemStatus = null;
     this.askStop = false;
@@ -41,7 +43,7 @@ export class WavStreamPlayer {
    * Connects the audio context and enables output to speakers
    * @returns {Promise<true>}
    */
-  async connect(newsAudio, setIsPlaying) {
+  async connect(newsAudio, newsVideo, setIsPlaying) {
     this.context = new AudioContext({ sampleRate: this.sampleRate });
     if (this.context.state === 'suspended') {
       await this.context.resume();
@@ -58,6 +60,7 @@ export class WavStreamPlayer {
     this.analyser = analyser;
     // hanks - 
     this.newsAudio = newsAudio;
+    this.newsVideo = newsVideo;
     this.setIsPlaying = setIsPlaying;  
     this.gainNode = this.context.createGain(); // Create gain node for volume control
     this.gainNode.connect(this.context.destination); // Connect gain to output    
@@ -114,7 +117,7 @@ export class WavStreamPlayer {
         // hanks
         // 'stop_by_completion' will be triggered together with 'stop' for each delta chunk finished playing
         // BUT, audio will be resumed only after item with 'completed' staus received after the last chunk 
-        if(this.itemStatus === 'completed' && this.newsAudio) {
+        if(this.itemStatus === 'completed' && this.newsAudio && this.isHidden) {
           if(this.askStop) {
             this.newsAudio.pause();
             //this.askStop = false;
@@ -123,6 +126,16 @@ export class WavStreamPlayer {
             this.setIsPlaying(true);            
           }
         }
+
+        if(this.itemStatus === 'completed' && this.newsVideo && !this.isHidden) {
+          if(this.askStop) {
+            this.newsVideo.pause();
+            //this.askStop = false;
+          } else {
+            this.newsVideo.play();
+            this.setIsPlaying(true);            
+          }
+        }          
         // hanks
       }
     };

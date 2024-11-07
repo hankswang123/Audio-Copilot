@@ -26,6 +26,8 @@ import { Map } from '../components/Map';
 
 import './ConsolePage.scss';
 import { isJsxOpeningLikeElement } from 'typescript';
+import e from 'express';
+import { audioCaptions } from '../utils/audio_captions.js';
 
 //import nodemailer from 'nodemailer';
 /**
@@ -131,8 +133,16 @@ export function ConsolePage() {
   const [isMuted, setIsMuted] = useState(true);
   const [progress, setProgress] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1.0); // State to control playback speed
+  const [isHidden, setIsHidden] = useState(true); // State to control audio/video visibility
+  const [isDragging, setIsDragging] = useState(false);
+  const [currentCaption, setCurrentCaption] = useState(''); // State to display current caption
+  const [totalDuration, setTotalDuration] = useState(0); // State to store total duration
+  const [currentTime, setCurrentTime] = useState(0); // State to store current play time
+  const [isCaptionVisible, setIsCaptionVisible] = useState(true); // State to manage caption visibility
+  const progressBarRef = useRef(null);  
+  const playPauseBtnRef = useRef<HTMLButtonElement>(null); // Add a ref for the play/pause button
   const audioRef = useRef<HTMLAudioElement | null>(null);  
-  //const videoRef = useRef<HTMLVideoElement | null>(null);  
+  const videoRef = useRef<HTMLVideoElement | null>(null);  
 
   /*
   // Create a transporter object
@@ -159,8 +169,39 @@ export function ConsolePage() {
     }
   };*/
 
+  const toggleVisibility = () => {
+    setIsHidden(!isHidden);
+
+    if(isHidden) {
+
+      //audio is hidden, switch from audio to video
+      if (audioRef.current) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current = new Audio('./audio/ck_interview.mp3');
+      }
+      if (videoRef.current) {
+        videoRef.current.play();
+      }        
+    } else {
+      //video is hidden, swtich from video to audio
+      if (audioRef.current) {
+        audioRef.current.play();
+      }
+      else {
+        audioRef.current = new Audio('./audio/ck_interview.mp3');
+        //audioRef.current.play();
+      }
+
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }  
+    }
+  };  
+
   useEffect(() => {
-    audioRef.current = new Audio('./audio/ck_interview.mp3');
+    audioRef.current = new Audio('./audio/ngl_sep.wav');
+    //audioRef.current = new Audio('./audio/ck_interview.mp3');
     //audioRef.current = new Audio('./audio/sap_news_jack.wav');
     //audioRef.current = new Audio('./audio/sap_new_notbooklm.wav');
 
@@ -180,6 +221,22 @@ export function ConsolePage() {
     }
   }, [playbackRate]);
 
+  const playVideo = () => {
+    if (videoRef.current) {
+      videoRef.current.play();
+    }
+  };
+
+  const pauseVideo = () => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+    }
+  };  
+
+  const toggleCaptionVisibility = () => {
+    setIsCaptionVisible(!isCaptionVisible);
+  };     
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -187,18 +244,102 @@ export function ConsolePage() {
     const updateProgress = () => {
       if (audio.duration) {
         setProgress((audio.currentTime / audio.duration) * 100);
+        setCurrentTime(audio.currentTime);
       }
+    };
+    
+    const updateCaption = () => {
+      const currentTime = audio.currentTime;
+      /*
+      const matchingCaptions = audioCaptions.filter((caption, index) => {
+        const nextCaption = audioCaptions[index + 1];
+        return currentTime >= caption.time && (!nextCaption || currentTime < nextCaption.time);
+      });
+      const combinedCaptionText = matchingCaptions.map(caption => caption.text).join(' ');
+      setCurrentCaption(combinedCaptionText);
+      */
+      const currentCaption = audioCaptions.find((caption, index) => {
+        const nextCaption = audioCaptions[index + 1];
+        return currentTime >= caption.time && (!nextCaption || currentTime < nextCaption.time);
+      });
+      setCurrentCaption(currentCaption ? currentCaption.text : '');     
+    };   
+
+    const handleLoadedMetadata = () => {
+      setTotalDuration(audio.duration);
     };
 
     audio.addEventListener('timeupdate', updateProgress);
+    audio.addEventListener('timeupdate', updateCaption);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
 
     return () => {
       audio.removeEventListener('timeupdate', updateProgress);
+      audio.removeEventListener('timeupdate', updateCaption);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
     };
   }, []);  
 
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+      setIsDragging(true);
+      updateProgress(e.nativeEvent);
+    };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (isDragging) {
+      updateProgress(e);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const updateProgress = (e: MouseEvent | React.MouseEvent<HTMLDivElement>) => {
+      const progressBar = progressBarRef.current;
+      if(progressBar)
+      {
+        const rect = (progressBar as HTMLDivElement).getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const newProgress = (offsetX / rect.width) * 100;
+        setProgress(newProgress);
+
+        if (audioRef.current) {
+          // Update the playback position based on newProgress          
+          audioRef.current.currentTime = (newProgress / 100) * audioRef.current.duration;
+        }
+      }
+    };
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);  
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault(); // Prevent default space bar action (scrolling)
+        //toggleAudio();       
+        if (playPauseBtnRef.current) {
+          playPauseBtnRef.current.click(); // Trigger the button click event
+        }        
+      }
+    };
+  
+    document.addEventListener('keydown', handleKeyDown);
+  
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []); // Empty dependency array to run only once on mount  
+
   const toggleAudio = async () => {
-    if (audioRef.current) {
+    if (audioRef.current && isHidden) {
       if (isPlaying) {
         //audio should be paused when User speaks or LLM speaks
         audioRef.current.pause();
@@ -208,6 +349,18 @@ export function ConsolePage() {
           audioRef.current.play();
         } catch (error) {
           console.error('Error playing audio:', error);
+        }
+      }
+      setIsPlaying(!isPlaying);
+    }
+    if(videoRef.current && !isHidden) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        try {
+          videoRef.current.play();
+        } catch (error) {
+          console.error('Error playing video:', error);
         }
       }
       setIsPlaying(!isPlaying);
@@ -258,7 +411,9 @@ export function ConsolePage() {
     setIsMuted(false);
     const wavRecorder = wavRecorderRef.current;
     const client = clientRef.current;
-    await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+    if (client.isConnected()){
+      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+    }
   };    
 
   const muteRecording = async () => {
@@ -288,6 +443,25 @@ export function ConsolePage() {
     }    
   };
 
+  useEffect(() => {
+    const checkConnectionStatus = async () => {
+      // Replace this with your actual connection status check
+      if (!clientRef.current) {
+        return;
+      } else {
+        const status = clientRef.current.isConnected();
+        setIsConnected(status);
+        if(!status) {
+          await switchAudioCopilotOn();
+        }
+      }
+    };
+
+    const intervalId = setInterval(checkConnectionStatus, 4000); // Check every 5 seconds
+
+    return () => clearInterval(intervalId); // Cleanup interval on component unmount
+  }, []);
+
   /**
      * Switch to Audio Copilot On
      */
@@ -302,60 +476,78 @@ export function ConsolePage() {
     //setItems(client.conversation.getItems());
     setItems(items);
 
+    /*
     // Connect to microphone
     await wavRecorder.begin();
 
     // Connect to audio output
     // Enhanced with one parameter to resume playback when reply speek is finished
-    await wavStreamPlayer.connect(audioRef.current, setIsPlaying);
+    await wavStreamPlayer.connect(audioRef.current, videoRef.current, setIsPlaying);
     wavStreamPlayer.askStop = true;
+    */
 
-    // Connect to realtime API
-    await client.connect();
-    /*
-    client.sendUserMessageContent([
-      {
-        type: `input_text`,
-        text: `Hello!`,
-        // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
-      },
-    ]);    */
-    setIsConnected(true);
+    try{
+      // Connect to realtime API
+      await client.connect();
 
-    if (client.getTurnDetectionType() === 'server_vad') {
-      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-      // Test new feature - Capture audio from other apps 
+      // Connect to microphone
+      await wavRecorder.begin();
+
+      // Connect to audio output
+      // Enhanced with one parameter to resume playback when reply speek is finished
+      await wavStreamPlayer.connect(audioRef.current, videoRef.current, setIsPlaying);
+      wavStreamPlayer.askStop = true;      
+
       /*
-      const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true });
-      const audioContext = new AudioContext({ sampleRate: 44100 });
-      const source = audioContext.createMediaStreamSource(stream);
-  
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      source.connect(processor);
-      processor.connect(audioContext.destination);
-  
-      processor.onaudioprocess = (audioEvent) => {
-          const float32Data = audioEvent.inputBuffer.getChannelData(0);
-          const pcm16Data = new Int16Array(float32Data.length);
-  
-          // Convert Float32 to PCM16
-          for (let i = 0; i < float32Data.length; i++) {
-              let s = Math.max(-1, Math.min(1, float32Data[i]));
-              pcm16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-          }
-          
-          client.appendInputAudio(pcm16Data);
+      client.sendUserMessageContent([
+        {
+          type: `input_text`,
+          text: `Hello!`,
+          // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+        },
+      ]);    */
+      setIsConnected(true);
 
-          // pcm16Data now contains the PCM16 audio data
-          console.log(pcm16Data);
-          // You can now send pcm16Data to a server, save to file, etc.
-      }; */         
-      // Test new feature - Capture audio from other apps
-      
+      if (client.getTurnDetectionType() === 'server_vad') {
+        await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+        // Test new feature - Capture audio from other apps 
+        /*
+        const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true });
+        const audioContext = new AudioContext({ sampleRate: 44100 });
+        const source = audioContext.createMediaStreamSource(stream);
+    
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+    
+        processor.onaudioprocess = (audioEvent) => {
+            const float32Data = audioEvent.inputBuffer.getChannelData(0);
+            const pcm16Data = new Int16Array(float32Data.length);
+    
+            // Convert Float32 to PCM16
+            for (let i = 0; i < float32Data.length; i++) {
+                let s = Math.max(-1, Math.min(1, float32Data[i]));
+                pcm16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            
+            client.appendInputAudio(pcm16Data);
+
+            // pcm16Data now contains the PCM16 audio data
+            console.log(pcm16Data);
+            // You can now send pcm16Data to a server, save to file, etc.
+        }; */         
+        // Test new feature - Capture audio from other apps
+        
+      }
+
+      // mute recording by default when copilot is turned on
+      await muteRecording();      
+
+    } catch (error) {
+      //switchAudioCopilotOff();
+      console.error('Error playing audio:', error);
     }
 
-    // mute recording by default when copilot is turned on
-    await muteRecording();
   }, []);
     
   /**
@@ -382,6 +574,12 @@ export function ConsolePage() {
     await wavStreamPlayer.interrupt();   
 
   }, []);
+
+  //hanks - switch to Audio Copilot On by default
+  useEffect(() => {
+    switchAudioCopilot('server_vad');
+  }, []);   
+  //  
 
   /**
    * Capture audio from other apps, e.g. Microsoft Teams, 
@@ -451,116 +649,10 @@ export function ConsolePage() {
     }
   }, []);
 
-  /**
-   * Connect to conversation:
-   * WavRecorder taks speech input, WavStreamPlayer output, client is API client
-   */
-  const connectConversation = useCallback(async () => {
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    const wavStreamPlayer = wavStreamPlayerRef.current;
-
-    // Set state variables
-    startTimeRef.current = new Date().toISOString();
-    setIsConnected(true);
-    setRealtimeEvents([]);
-    setItems(client.conversation.getItems());
-
-    // Connect to microphone
-    await wavRecorder.begin();
-
-    // Connect to audio output
-    await wavStreamPlayer.connect();
-
-    // Connect to realtime API
-    await client.connect();
-    client.sendUserMessageContent([
-      {
-        type: `input_text`,
-        text: `Hello!`,
-        // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
-      },
-    ]);
-
-    if (client.getTurnDetectionType() === 'server_vad') {
-      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-    }
-  }, []);
-
-  /**
-   * Disconnect and reset conversation state
-   */
-  const disconnectConversation = useCallback(async () => {
-    setIsConnected(false);
-    setRealtimeEvents([]);
-    setItems([]);
-    setMemoryKv({});
-    setCoords({
-      lat: 37.775593,
-      lng: -122.418137,
-    });
-    setMarker(null);
-
-    const client = clientRef.current;
-    client.disconnect();
-
-    const wavRecorder = wavRecorderRef.current;
-    await wavRecorder.end();
-
-    const wavStreamPlayer = wavStreamPlayerRef.current;
-    await wavStreamPlayer.interrupt();
-  }, []);
-
   const deleteConversationItem = useCallback(async (id: string) => {
     const client = clientRef.current;
     client.deleteItem(id);
   }, []);
-
-  /**
-   * In push-to-talk mode, start recording
-   * .appendInputAudio() for each sample
-   */
-  const startRecording = async () => {
-    setIsRecording(true);
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    const wavStreamPlayer = wavStreamPlayerRef.current;
-    const trackSampleOffset = await wavStreamPlayer.interrupt();
-    if (trackSampleOffset?.trackId) {
-      const { trackId, offset } = trackSampleOffset;
-      await client.cancelResponse(trackId, offset);
-    }
-    await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-  };
-
-  /**
-   * In push-to-talk mode, stop recording
-   */
-  const stopRecording = async () => {
-    setIsRecording(false);
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    await wavRecorder.pause();
-    client.createResponse();
-  };
-
-  /**
-   * Switch between Manual <> VAD mode for communication
-   */
-  const changeTurnEndType = async (value: string) => {
-    const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    if (value === 'none' && wavRecorder.getStatus() === 'recording') {
-      await wavRecorder.pause();
-    }
-    client.updateSession({
-      turn_detection: value === 'none' ? null : { type: 'server_vad' },
-    });
-    if (value === 'server_vad' && client.isConnected()) {
-      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-    }
-    setCanPushToTalk(value === 'none');
-  };
 
   /**
    * Auto-scroll the event logs
@@ -984,6 +1076,7 @@ export function ConsolePage() {
     client.on('conversation.updated', async ({ item, delta }: any) => {
       // hanks - Resume audio when item is 'completed'
       wavStreamPlayer.setItemStatus(item.status);
+      wavStreamPlayer.isHidden = isHidden;
       // hanks 
 
       const items = client.conversation.getItems();
@@ -1007,7 +1100,11 @@ export function ConsolePage() {
         audioRef.current.pause();
         setIsPlaying(false);
       }      
-    });
+      if (videoRef.current){
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+    });     
     // hanks
 
     setItems(client.conversation.getItems());
@@ -1017,6 +1114,19 @@ export function ConsolePage() {
       client.reset();
     };
   }, []);
+
+  interface FormatTimeProps {
+    time: number;
+  }
+
+  const formatDuration = ({ time }: FormatTimeProps): string => {
+    const hours = Math.floor(time / 3600);
+    const minutes = Math.floor((time % 3600) / 60);
+    const seconds = Math.floor(time % 60);
+    return hours > 0
+      ? `${hours}:${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`
+      : `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
 
   /**
    * Render the application
@@ -1040,9 +1150,94 @@ export function ConsolePage() {
           )}
         </div>
       </div>
+      <div>
+        <object data="./resource/background.pdf" type="application/pdf" width="100%" height="672px">
+          <p>Your browser does not support PDFs. <a href="background.pdf">Download the PDF</a>.</p>
+        </object>        
+      </div>
+      {/* Add a div to display the current caption */}
+      {isCaptionVisible && (
+        <div className="caption-display">
+          {currentCaption}
+        </div>
+      )}      
+      <div className='button-row'>
+        <Button
+              label={isCaptionVisible ? 'Hide Captions' : 'Show Captions'}
+              buttonStyle={'regular'}
+              onClick={toggleCaptionVisibility}
+            />  
+        {/* This hidden button is to receive space bar down event to play/pause the audio */}
+        <button ref={playPauseBtnRef} onClick={toggleAudio} className='hidden-button'></button>
+        <Button
+                label={isPlaying ? 'Pause' : 'Play\u00A0'}
+                iconPosition={'start'}
+                icon={isPlaying ? Pause : Play}
+                buttonStyle={'regular'}
+                onClick={
+                  isPlaying ? toggleAudio : toggleAudio
+                }
+              />
+        <div 
+          ref={progressBarRef}
+          style={{position: 'relative', width: '55%', backgroundColor: '#ccc', height: '10px', borderRadius: '10px', marginTop: '10px', marginLeft: '-16px' }}
+          onMouseDown={handleMouseDown}
+        >
+          <div
+            style={{
+              width: `${progress}%`,
+              backgroundColor: '#007bff',
+              height: '10px',
+              borderRadius: '10px',
+            }}
+          />
+          {/* Display the current play time */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '-25px', // Adjust as needed
+              left: `${progress}%`, // Move with the progress bar
+              transform: 'translateX(-20%)', // Center the text
+              backgroundColor: 'rgba(255, 255, 255, 0)',
+              color: 'rgba(0, 0, 0, 0.7)',
+              padding: '5px',
+              borderRadius: '5px',
+              fontSize: '0.9em',
+            }}
+          >
+            {formatDuration({time: currentTime})}
+          </div>          
+          {/* Display the total duration */}
+          <div className="audio-duration">
+            {/*totalDuration*/}
+            {/*formatTime({totalDuration})*/}
+            {formatDuration({time: totalDuration})}
+          </div>          
+        </div>    
+        {/* Hide the audio copilot Toggle component and set it on by default */}    
+        {false && (            
+          <Toggle
+            defaultValue={true}
+            labels={['\u00A0', 'Audio Copilot']}
+            values={['none', 'server_vad']}
+            onChange={(_, value) => switchAudioCopilot(value)}
+          />
+        )}            
+        <Button
+            label={isMuted ? '' : ''}
+            iconPosition={'start'}
+            icon={isMuted ? MicOff : Mic}
+            disabled={!isConnected}
+            buttonStyle={'regular'}
+            onClick={
+              isMuted ? toggleMuteRecording : toggleMuteRecording
+            }
+          /> 
+          <div style={{ fontSize: '1.2em' }}>{isConnected? 'Copilot is On' : 'Connecting...' }</div>                 
+      </div>      
       <div className="content-main">
         <div className="content-logs">
-          <div className="content-block conversation">
+          <div className={isHidden ? 'content-block conversation-display' : 'content-block conversation'}>
             <div className="content-block-title">
               {isConnected ? (
                 <>
@@ -1114,8 +1309,20 @@ export function ConsolePage() {
                 );
               })}
             </div>
-          </div>          
+          </div>
+          <div className={isHidden ? 'video' : 'video-display'}>     
+            <video ref={videoRef} width="600px" controls>
+                <source src="./video/ck_interview.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+            </video> 
+          </div>                       
           <div className="content-actions">
+          <Button
+              label={isHidden ? 'A/V' : 'V/A'}
+              buttonStyle={'regular'}
+              onClick={toggleVisibility}
+            />             
+          <div className='spacer' />            
           <Button
               label={isPlaying ? 'Pause' : 'Play\u00A0'}
               iconPosition={'start'}
