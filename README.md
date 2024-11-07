@@ -6,6 +6,6 @@ Audio Copilot enables the interaction with content during playback on-going. It 
 - Control the player by voice commands. e.g. 'stop', 'resume'...
 - Search News by google integrated by SERPAPI
 
-This idea is implemented based on [OpenAI Realtime Console](https://github.com/openai/openai-realtime-console)
-
 <img src="/readme/audio-copilot.png" width="800" />
+
+This idea is implemented based on [OpenAI Realtime Console](https://github.com/openai/openai-realtime-console)
