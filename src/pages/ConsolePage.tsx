@@ -11,6 +11,11 @@
 const LOCAL_RELAY_SERVER_URL: string =
   process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
 
+//debug purpose
+/*
+const LOCAL_RELAY_SERVER_URL: string =
+  process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || 'http://localhost:8081';*/
+
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 import { RealtimeClient } from '@openai/realtime-api-beta';
@@ -62,6 +67,7 @@ export function ConsolePage() {
    * Ask user for API Key
    * If we're using the local relay server, we don't need this
    */
+  //localStorage.clear(); // For debug purposes
   const apiKey = LOCAL_RELAY_SERVER_URL
     ? ''
     : localStorage.getItem('tmp::voice_api_key') ||
@@ -139,6 +145,7 @@ export function ConsolePage() {
   const [totalDuration, setTotalDuration] = useState(0); // State to store total duration
   const [currentTime, setCurrentTime] = useState(0); // State to store current play time
   const [isCaptionVisible, setIsCaptionVisible] = useState(true); // State to manage caption visibility
+  const [isMuteBtnDisabled, setIsMuteBtnDisabled] = useState(false);
   const progressBarRef = useRef(null);  
   const playPauseBtnRef = useRef<HTMLButtonElement>(null); // Add a ref for the play/pause button
   const audioRef = useRef<HTMLAudioElement | null>(null);  
@@ -200,7 +207,8 @@ export function ConsolePage() {
   };  
 
   useEffect(() => {
-    audioRef.current = new Audio('./audio/ngl_sep.wav');
+    audioRef.current = new Audio('./audio/ngl_sep_lite.mp3');
+    //audioRef.current = new Audio('./audio/ngl_sep.wav');
     //audioRef.current = new Audio('./audio/ck_interview.mp3');
     //audioRef.current = new Audio('./audio/sap_news_jack.wav');
     //audioRef.current = new Audio('./audio/sap_new_notbooklm.wav');
@@ -250,14 +258,6 @@ export function ConsolePage() {
     
     const updateCaption = () => {
       const currentTime = audio.currentTime;
-      /*
-      const matchingCaptions = audioCaptions.filter((caption, index) => {
-        const nextCaption = audioCaptions[index + 1];
-        return currentTime >= caption.time && (!nextCaption || currentTime < nextCaption.time);
-      });
-      const combinedCaptionText = matchingCaptions.map(caption => caption.text).join(' ');
-      setCurrentCaption(combinedCaptionText);
-      */
       const currentCaption = audioCaptions.find((caption, index) => {
         const nextCaption = audioCaptions[index + 1];
         return currentTime >= caption.time && (!nextCaption || currentTime < nextCaption.time);
@@ -324,7 +324,6 @@ export function ConsolePage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         e.preventDefault(); // Prevent default space bar action (scrolling)
-        //toggleAudio();       
         if (playPauseBtnRef.current) {
           playPauseBtnRef.current.click(); // Trigger the button click event
         }        
@@ -407,19 +406,30 @@ export function ConsolePage() {
     }
   };
 
+  /*
+  * Unmute recording, the audio copilot by first unmuting the recording  
+  */
   const unmuteRecording = async () => {
-    setIsMuted(false);
-    const wavRecorder = wavRecorderRef.current;
+    //setIsMuted(false);
+    //const wavRecorder = wavRecorderRef.current;
     const client = clientRef.current;
     if (client.isConnected()){
+      setIsMuted(false);
+      const wavRecorder = wavRecorderRef.current;      
       await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+    } else {
+      setIsMuteBtnDisabled(true);
+      switchAudioCopilot('server_vad');
     }
   };    
 
   const muteRecording = async () => {
-    setIsMuted(true);
-    const wavRecorder = wavRecorderRef.current;
-    await wavRecorder.pause();
+    const client = clientRef.current;
+    if (client.isConnected()){
+      setIsMuted(true);
+      const wavRecorder = wavRecorderRef.current;
+      await wavRecorder.pause();
+    }
   };    
 
   /**
@@ -443,6 +453,7 @@ export function ConsolePage() {
     }    
   };
 
+  /*
   useEffect(() => {
     const checkConnectionStatus = async () => {
       // Replace this with your actual connection status check
@@ -460,7 +471,7 @@ export function ConsolePage() {
     const intervalId = setInterval(checkConnectionStatus, 4000); // Check every 5 seconds
 
     return () => clearInterval(intervalId); // Cleanup interval on component unmount
-  }, []);
+  }, []); */
 
   /**
      * Switch to Audio Copilot On
@@ -508,7 +519,7 @@ export function ConsolePage() {
       ]);    */
       setIsConnected(true);
 
-      if (client.getTurnDetectionType() === 'server_vad') {
+      if (client.getTurnDetectionType() === 'server_vad' && client.isConnected()) {
         await wavRecorder.record((data) => client.appendInputAudio(data.mono));
         // Test new feature - Capture audio from other apps 
         /*
@@ -541,7 +552,7 @@ export function ConsolePage() {
       }
 
       // mute recording by default when copilot is turned on
-      await muteRecording();      
+      //await muteRecording();      
 
     } catch (error) {
       //switchAudioCopilotOff();
@@ -576,9 +587,10 @@ export function ConsolePage() {
   }, []);
 
   //hanks - switch to Audio Copilot On by default
+  /*
   useEffect(() => {
     switchAudioCopilot('server_vad');
-  }, []);   
+  }, []); */
   //  
 
   /**
@@ -899,7 +911,7 @@ export function ConsolePage() {
       }
     );
     client.addTool(
-      { //Voice commands to control the on-going playbac, e,g. pause, resume, speed up, speed down, 
+      { //Voice commands to control the on-going playback, e,g. pause, resume, speed up, speed down, 
         //skip forward, skip backward, volume up, volume down, peek the current time of the audio
         name: 'audio_control',
         description:
@@ -1065,7 +1077,10 @@ export function ConsolePage() {
         }
       });
     });
-    client.on('error', (event: any) => console.error(event));
+//    client.on('error', (event: any) => console.error(event));
+    client.on('error', (event: any) => {
+      console.error(event);
+    });
     client.on('conversation.interrupted', async () => {
       const trackSampleOffset = await wavStreamPlayer.interrupt();
       if (trackSampleOffset?.trackId) {
@@ -1094,7 +1109,7 @@ export function ConsolePage() {
       setItems(items);
     });
 
-    // hanks - Pause audio file playing when speech is detected
+    // hanks - Pause on-going playback when speech is detected
     client.realtime.on('server.input_audio_buffer.speech_started', () => {
       if (audioRef.current){
         audioRef.current.pause();
@@ -1105,6 +1120,17 @@ export function ConsolePage() {
         setIsPlaying(false);
       }
     });     
+    // Copilot will be activated at the first click of the mute button to unmute to ask for the first question
+    client.realtime.on('server.session.created', () => {
+      //when a new connection is established as this first server event received
+      //Ensure Mute/Unmute button is only active after both the connection is established and the recording is started
+      const intervalId = setInterval(() => {
+        if ('recording' === wavRecorderRef.current.getStatus()) {
+          clearInterval(intervalId);
+          setIsMuteBtnDisabled(false);
+        }
+      }, 100);
+    });      
     // hanks
 
     setItems(client.conversation.getItems());
@@ -1151,8 +1177,8 @@ export function ConsolePage() {
         </div>
       </div>
       <div>
-        <object data="./resource/background.pdf" type="application/pdf" width="100%" height="672px">
-          <p>Your browser does not support PDFs. <a href="background.pdf">Download the PDF</a>.</p>
+        <object data="./resource/background_lite.pdf" type="application/pdf" width="100%" height="672px">
+          {<p>Your browser does not support PDFs. <a href="./resource/background_lite.pdf">Download the PDF</a>.</p> }
         </object>        
       </div>
       {/* Add a div to display the current caption */}
@@ -1222,18 +1248,19 @@ export function ConsolePage() {
             values={['none', 'server_vad']}
             onChange={(_, value) => switchAudioCopilot(value)}
           />
-        )}            
+        )}
+        {/* disabled={!isConnected} of mute/unmute button is removed */}
         <Button
             label={isMuted ? '' : ''}
             iconPosition={'start'}
             icon={isMuted ? MicOff : Mic}
-            disabled={!isConnected}
+            disabled={isMuteBtnDisabled}
             buttonStyle={'regular'}
             onClick={
               isMuted ? toggleMuteRecording : toggleMuteRecording
             }
           /> 
-          <div style={{ fontSize: '1.2em' }}>{isConnected? 'Copilot is On' : 'Connecting...' }</div>                 
+          <div style={{ fontSize: '1.2em' }}>{isConnected ? 'Copilot: On' : (isMuteBtnDisabled ? 'Copilot: Starting...' : 'Copilot: Off')}</div>                 
       </div>      
       <div className="content-main">
         <div className="content-logs">

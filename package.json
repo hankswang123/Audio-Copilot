@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "type": "module",
   "private": true,
+  "how_to_set_homepage": "Check following two entries",
+  "local_run_by_npm_start": "homepage should be deleted or changed to, e.g. homepage_",
+  "gh-pages_by_npm_run_deploy": "homepage should be set to the gh-pages url as bellow",
+  "homepage": "https://hankswang123.github.io/Audio-Copilot/",
   "dependencies": {
     "@openai/realtime-api-beta": "github:openai/openai-realtime-api-beta",
     "@testing-library/jest-dom": "^5.17.0",
@@ -17,6 +21,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
+    "gh-pages": "^6.2.0",
     "leaflet": "^1.9.4",
     "nodemailer": "^6.9.15",
     "react": "^18.3.1",
@@ -36,7 +41,9 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "zip": "zip -r realtime-api-console.zip . -x 'node_modules' 'node_modules/*' 'node_modules/**' '.git' '.git/*' '.git/**' '.DS_Store' '*/.DS_Store' 'package-lock.json' '*.zip' '*.tar.gz' '*.tar' '.env'",
-    "relay": "nodemon ./relay-server/index.js"
+    "relay": "nodemon ./relay-server/index.js",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"    
   },
   "eslintConfig": {
     "extends": [
