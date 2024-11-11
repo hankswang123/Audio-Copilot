@@ -1271,36 +1271,34 @@ export function ConsolePage() {
           style={{position: 'relative', width: '45%', backgroundColor: '#ccc', height: '10px', borderRadius: '10px', marginTop: '10px', marginLeft: '-16px' }}
           onMouseDown={handleMouseDown}
         >
-          <div
-            style={{
-              width: `${progress}%`,
-              backgroundColor: '#007bff',
-              height: '10px',
-              borderRadius: '10px',
-            }}
-          />
-          {/* Display the current play time */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '-25px', // Adjust as needed
-              left: `${progress}%`, // Move with the progress bar
-              transform: 'translateX(-20%)', // Center the text
-              backgroundColor: 'rgba(255, 255, 255, 0)',
-              color: 'rgba(0, 0, 0, 0.7)',
-              padding: '5px',
-              borderRadius: '5px',
-              fontSize: '0.9em',
-            }}
-          >
-            {formatDuration({time: currentTime})}
-          </div>          
-          {/* Display the total duration */}
-          <div className="audio-duration">
-            {/*totalDuration*/}
-            {/*formatTime({totalDuration})*/}
-            {formatDuration({time: totalDuration})}
-          </div>          
+        <div
+          style={{
+            width: `${progress}%`,
+            backgroundColor: '#007bff',
+            height: '10px',
+            borderRadius: '10px',
+          }}
+        />
+        {/* Display the current play time */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '-24px', // Adjust as needed
+            left: `${progress}%`, // Move with the progress bar
+            transform: 'translateX(-20%)', // Center the text
+            backgroundColor: 'rgba(255, 255, 255, 0)',
+            color: 'rgba(0, 0, 0, 0.7)',
+            padding: '5px',
+            borderRadius: '5px',
+            fontSize: '0.9em',
+          }}
+        >
+          {formatDuration({time: currentTime})}
+        </div>          
+        {/* Display the total duration */}
+        <div className="audio-duration">
+          {formatDuration({time: totalDuration})}
+        </div>          
         </div>    
         {/* Hide the audio copilot Toggle component and set it on by default */}    
         {false && (            
