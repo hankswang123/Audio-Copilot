@@ -56,6 +56,7 @@
 
   .button-row {
     display: flex;
+    flex-grow: 1;
     gap: 16px; /* Space between buttons */
     align-items: center; /* Align items vertically in the center */    
     position: fixed;
@@ -66,6 +67,14 @@
     padding: 3px; /* Optional: Add some padding */
     box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
   } 
+
+  .content-api-key-1 {
+    //visibility: hidden;
+    //visibility:visible;
+    display: flex;
+    justify-content: flex-end;      
+    margin-left: auto;
+  }   
 
   .content-top {
     //display: flex;
@@ -87,8 +96,10 @@
       }
     }
     .content-api-key {
-      visibility: hidden;
+      //visibility: hidden;
       //visibility:visible;
+      display: flex;
+      justify-content: flex-end;      
     }    
   }
 
@@ -218,6 +229,54 @@
       }      
     }
   }
+
+  .container {
+    position: relative;
+    display: inline-block;
+    z-index: 9998;
+  }
+
+  .tooltip {
+    visibility: hidden;
+    //background-color: #333;
+    background-color: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    text-align: center;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #333; /* Adds a subtle border */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Adds a shadow for depth */
+    position: absolute;
+    bottom: 100%; /* Position above the button */
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 10px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    width: 250px;
+    z-index: 9999;
+  }  
+
+  .tooltip-title {
+    font-size: 1.2em; /* Make title slightly larger */
+    font-weight: bold; /* Emphasize the title */
+  }  
+
+  .tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%; /* Position at the bottom of the tooltip */
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px; /* Size of the arrow */
+    border-style: solid;
+    border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent; /* Arrow color */
+  }  
+
+  .container:hover .tooltip {
+    visibility: visible;
+    opacity: 1;
+  }  
 
   .video {
         display: none;

@@ -68,6 +68,7 @@ export function ConsolePage() {
    * If we're using the local relay server, we don't need this
    */
   //localStorage.clear(); // For debug purposes
+  /*
   const apiKey = LOCAL_RELAY_SERVER_URL
     ? ''
     : localStorage.getItem('tmp::voice_api_key') ||
@@ -75,8 +76,8 @@ export function ConsolePage() {
       '';
   if (apiKey !== '') {
     localStorage.setItem('tmp::voice_api_key', apiKey);
-  }
-
+  }*/
+    const apiKey = '';
   /**
    * Instantiate:
    * - WavRecorder (speech input)
@@ -146,6 +147,9 @@ export function ConsolePage() {
   const [currentTime, setCurrentTime] = useState(0); // State to store current play time
   const [isCaptionVisible, setIsCaptionVisible] = useState(true); // State to manage caption visibility
   const [isMuteBtnDisabled, setIsMuteBtnDisabled] = useState(false);
+  const [isConnectionError, setIsConnectionError] = useState(false);
+  const [startingText, setStartingText] = useState('Copilot is turning on');
+  const [dotCount, setDotCount] = useState(0);
   const progressBarRef = useRef(null);  
   const playPauseBtnRef = useRef<HTMLButtonElement>(null); // Add a ref for the play/pause button
   const audioRef = useRef<HTMLAudioElement | null>(null);  
@@ -175,6 +179,26 @@ export function ConsolePage() {
       console.error('Error sending email:', error);
     }
   };*/
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+  
+    if (isMuteBtnDisabled) {
+      intervalId = setInterval(() => {
+        setDotCount((prevCount) => (prevCount + 1) % 4); // Cycle through 0, 1, 2, 3
+      }, 500);
+    } else {
+      setStartingText(''); // Clear the text when not starting
+    }
+  
+    return () => clearInterval(intervalId); // Cleanup interval on component unmount or when isMuteBtnDisabled changes
+  }, [isMuteBtnDisabled]);  
+
+  useEffect(() => {
+    if (isMuteBtnDisabled) {
+      setStartingText(`Copilot is turning on${'.'.repeat(dotCount)}`);
+    }
+  }, [dotCount, isMuteBtnDisabled]);  
 
   const toggleVisibility = () => {
     setIsHidden(!isHidden);
@@ -404,6 +428,11 @@ export function ConsolePage() {
       }
       setIsMuted(!isMuted);
     }
+
+    const apiKey = localStorage.getItem('tmp::voice_api_key')
+    if (apiKey == '' || !clientRef.current.isConnected() || isConnectionError) {
+      setIsMuted(true);
+    }        
   };
 
   /*
@@ -498,9 +527,30 @@ export function ConsolePage() {
     */
 
     try{
+      setIsConnectionError(false);
       // Connect to realtime API
-      await client.connect();
+      // debug finding: even without API_KEY is not set, the connection is still established
+      // websocket connection is established, but the API_KEY is not set
 
+  
+      const apiKey = LOCAL_RELAY_SERVER_URL
+        ? ''
+        : localStorage.getItem('tmp::voice_api_key') ||
+          prompt('OpenAI API Key') ||
+          '';
+      if (apiKey !== '') {
+        localStorage.setItem('tmp::voice_api_key', apiKey);
+      }      
+      if (apiKey !== '') {
+        client.realtime.apiKey = apiKey;
+        await client.connect();
+      } else {
+        //setIsMuted(!isMuted);
+        setIsMuteBtnDisabled(false);        
+      }
+      //await client.connect();
+
+      /*
       // Connect to microphone
       await wavRecorder.begin();
 
@@ -508,7 +558,7 @@ export function ConsolePage() {
       // Enhanced with one parameter to resume playback when reply speek is finished
       await wavStreamPlayer.connect(audioRef.current, videoRef.current, setIsPlaying);
       wavStreamPlayer.askStop = true;      
-
+      */
       /*
       client.sendUserMessageContent([
         {
@@ -517,10 +567,11 @@ export function ConsolePage() {
           // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
         },
       ]);    */
-      setIsConnected(true);
+      
+      //setIsConnected(true);
 
-      if (client.getTurnDetectionType() === 'server_vad' && client.isConnected()) {
-        await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+      //if (client.getTurnDetectionType() === 'server_vad' && client.isConnected()) {
+      //  await wavRecorder.record((data) => client.appendInputAudio(data.mono));
         // Test new feature - Capture audio from other apps 
         /*
         const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true });
@@ -549,12 +600,14 @@ export function ConsolePage() {
         }; */         
         // Test new feature - Capture audio from other apps
         
-      }
+      //}
 
       // mute recording by default when copilot is turned on
-      //await muteRecording();      
-
+      //await muteRecording();            
     } catch (error) {
+      setIsMuted(true);
+      setIsMuteBtnDisabled(false);
+      setIsConnectionError(true);
       //switchAudioCopilotOff();
       console.error('Error playing audio:', error);
     }
@@ -657,7 +710,7 @@ export function ConsolePage() {
     if (apiKey !== null) {
       localStorage.clear();
       localStorage.setItem('tmp::voice_api_key', apiKey);
-      window.location.reload();
+      //window.location.reload();
     }
   }, []);
 
@@ -1110,6 +1163,9 @@ export function ConsolePage() {
     });
 
     // hanks - Pause on-going playback when speech is detected
+    client.realtime.on('server.error', () => {
+      console.error("Error from server");
+    });    
     client.realtime.on('server.input_audio_buffer.speech_started', () => {
       if (audioRef.current){
         audioRef.current.pause();
@@ -1121,15 +1177,51 @@ export function ConsolePage() {
       }
     });     
     // Copilot will be activated at the first click of the mute button to unmute to ask for the first question
-    client.realtime.on('server.session.created', () => {
+    client.realtime.on('server.session.created', async () => {
       //when a new connection is established as this first server event received
       //Ensure Mute/Unmute button is only active after both the connection is established and the recording is started
+
+      const intervalId = setInterval(() => {
+        if ('paused' === wavRecorderRef.current.getStatus()) {
+          clearInterval(intervalId);
+          setIsMuteBtnDisabled(false);
+        }
+      }, 100);      
+
+      const client = clientRef.current;
+      const wavRecorder = wavRecorderRef.current;
+      const wavStreamPlayer = wavStreamPlayerRef.current;      
+
+      // Connect to microphone
+      await wavRecorder.begin();
+
+      // Connect to audio output
+      // Enhanced with one parameter to resume playback when reply speek is finished
+      await wavStreamPlayer.connect(audioRef.current, videoRef.current, setIsPlaying);
+      wavStreamPlayer.askStop = true;      
+
+      /*
+      client.sendUserMessageContent([
+        {
+          type: `input_text`,
+          text: `Hello!`,
+          // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+        },
+      ]);    */
+      setIsConnected(true);
+      
+      /*
+      if (client.getTurnDetectionType() === 'server_vad' && client.isConnected()) {
+        await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+      } */   
+
+      /*
       const intervalId = setInterval(() => {
         if ('recording' === wavRecorderRef.current.getStatus()) {
           clearInterval(intervalId);
           setIsMuteBtnDisabled(false);
         }
-      }, 100);
+      }, 100);*/
     });      
     // hanks
 
@@ -1206,7 +1298,7 @@ export function ConsolePage() {
               />
         <div 
           ref={progressBarRef}
-          style={{position: 'relative', width: '55%', backgroundColor: '#ccc', height: '10px', borderRadius: '10px', marginTop: '10px', marginLeft: '-16px' }}
+          style={{position: 'relative', width: '45%', backgroundColor: '#ccc', height: '10px', borderRadius: '10px', marginTop: '10px', marginLeft: '-16px' }}
           onMouseDown={handleMouseDown}
         >
           <div
@@ -1249,18 +1341,35 @@ export function ConsolePage() {
             onChange={(_, value) => switchAudioCopilot(value)}
           />
         )}
-        {/* disabled={!isConnected} of mute/unmute button is removed */}
-        <Button
-            label={isMuted ? '' : ''}
-            iconPosition={'start'}
-            icon={isMuted ? MicOff : Mic}
-            disabled={isMuteBtnDisabled}
-            buttonStyle={'regular'}
-            onClick={
-              isMuted ? toggleMuteRecording : toggleMuteRecording
-            }
-          /> 
-          <div style={{ fontSize: '1.2em' }}>{isConnected ? 'Copilot: On' : (isMuteBtnDisabled ? 'Copilot: Starting...' : 'Copilot: Off')}</div>                 
+        <div className="container">
+          <Button
+              label={isMuted ? '' : ''}
+              iconPosition={'start'}
+              icon={isMuted ? MicOff : Mic}
+              disabled={isMuteBtnDisabled}
+              buttonStyle={'regular'}
+              onClick={
+                isMuted ? toggleMuteRecording : toggleMuteRecording
+              }
+            />
+          <div className="tooltip">
+            <strong className='tooltip-title'>Turn on/off microphone</strong><br />
+            {!isConnected && <>The <span className="highlightred">first</span> turning on will start the Audio Copilot.<br /><br /> </>}
+          </div>            
+        </div> 
+        <div style={{ fontSize: '1.2em' }}>{isConnected ? ( <> Copilot is <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Connection error</span> occurred</> ) : ( <> Copilot is <span className="highlightred">Off</span> </> )) )}</div>
+        <div className="content-api-key-1">
+          {!LOCAL_RELAY_SERVER_URL && (
+            <Button
+              icon={Edit}
+              iconPosition="end"
+              buttonStyle="flush"
+              label={`\u00A0`}
+              title="Reset the OpenAI API Key"
+              onClick={() => resetAPIKey()}
+            />
+          )}
+        </div>        
       </div>      
       <div className="content-main">
         <div className="content-logs">
