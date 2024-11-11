@@ -11,11 +11,6 @@
 const LOCAL_RELAY_SERVER_URL: string =
   process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
 
-//debug purpose
-/*
-const LOCAL_RELAY_SERVER_URL: string =
-  process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || 'http://localhost:8081';*/
-
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 import { RealtimeClient } from '@openai/realtime-api-beta';
@@ -67,7 +62,6 @@ export function ConsolePage() {
    * Ask user for API Key
    * If we're using the local relay server, we don't need this
    */
-  //localStorage.clear(); // For debug purposes
   /*
   const apiKey = LOCAL_RELAY_SERVER_URL
     ? ''
@@ -77,7 +71,11 @@ export function ConsolePage() {
   if (apiKey !== '') {
     localStorage.setItem('tmp::voice_api_key', apiKey);
   }*/
-    const apiKey = '';
+
+  //Comment out orinial API Key Prompt and 
+  //Postpone the Prompt to first unmute click(will enable audio copilot)
+  const apiKey = '';
+
   /**
    * Instantiate:
    * - WavRecorder (speech input)
@@ -145,7 +143,7 @@ export function ConsolePage() {
   const [currentCaption, setCurrentCaption] = useState(''); // State to display current caption
   const [totalDuration, setTotalDuration] = useState(0); // State to store total duration
   const [currentTime, setCurrentTime] = useState(0); // State to store current play time
-  const [isCaptionVisible, setIsCaptionVisible] = useState(true); // State to manage caption visibility
+  const [isCaptionVisible, setIsCaptionVisible] = useState(false); // State to manage caption visibility
   const [isMuteBtnDisabled, setIsMuteBtnDisabled] = useState(false);
   const [isConnectionError, setIsConnectionError] = useState(false);
   const [startingText, setStartingText] = useState('Copilot is turning on');
@@ -155,7 +153,7 @@ export function ConsolePage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);  
   const videoRef = useRef<HTMLVideoElement | null>(null);  
 
-  /*
+  /* Try to addTool for sending mail by voice
   // Create a transporter object
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -180,6 +178,7 @@ export function ConsolePage() {
     }
   };*/
 
+  //Dynamic effect of 'Copilot is turning on......' 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
   
@@ -200,6 +199,7 @@ export function ConsolePage() {
     }
   }, [dotCount, isMuteBtnDisabled]);  
 
+  //Test copilot for video file
   const toggleVisibility = () => {
     setIsHidden(!isHidden);
 
@@ -391,7 +391,7 @@ export function ConsolePage() {
   };
 
   /**
-   * Utility for search news by google
+   * Utility for search news by google by addTool
    */
   async function performGoogleSearch(query: string): Promise<Array<{ title: string, url: string }>> {
     try {
@@ -481,26 +481,6 @@ export function ConsolePage() {
       }
     }    
   };
-
-  /*
-  useEffect(() => {
-    const checkConnectionStatus = async () => {
-      // Replace this with your actual connection status check
-      if (!clientRef.current) {
-        return;
-      } else {
-        const status = clientRef.current.isConnected();
-        setIsConnected(status);
-        if(!status) {
-          await switchAudioCopilotOn();
-        }
-      }
-    };
-
-    const intervalId = setInterval(checkConnectionStatus, 4000); // Check every 5 seconds
-
-    return () => clearInterval(intervalId); // Cleanup interval on component unmount
-  }, []); */
 
   /**
      * Switch to Audio Copilot On
@@ -639,13 +619,6 @@ export function ConsolePage() {
 
   }, []);
 
-  //hanks - switch to Audio Copilot On by default
-  /*
-  useEffect(() => {
-    switchAudioCopilot('server_vad');
-  }, []); */
-  //  
-
   /**
    * Capture audio from other apps, e.g. Microsoft Teams, 
    * This could be a new feature for Audio Copilot to prepare an reference answer when user is 
@@ -674,13 +647,10 @@ export function ConsolePage() {
         console.log(pcm16Data);
         // You can now send pcm16Data to a server, save to file, etc.
     };
-}
-
+  }
 //captureAudioToPCM16();
 
-
 //hanks
-
   /**
    * Utility for formatting the timing of logs
    */
@@ -1064,7 +1034,7 @@ export function ConsolePage() {
     );    
     client.addTool(
       { //Capabilities demo: when a lister wants to provide feedback
-        // or similarly, sharing it to a friend...
+        //or similarly, sharing it to a friend...
         name: 'feedback_collection',
         description:
           'Collect feedback from the user. e.g. feedback on the company AI first strategy...',
@@ -1130,7 +1100,7 @@ export function ConsolePage() {
         }
       });
     });
-//    client.on('error', (event: any) => console.error(event));
+//  client.on('error', (event: any) => console.error(event));
     client.on('error', (event: any) => {
       console.error(event);
     });
@@ -1284,6 +1254,7 @@ export function ConsolePage() {
               label={isCaptionVisible ? 'Hide Captions' : 'Show Captions'}
               buttonStyle={'regular'}
               onClick={toggleCaptionVisibility}
+              className='button'
             />  
         {/* This hidden button is to receive space bar down event to play/pause the audio */}
         <button ref={playPauseBtnRef} onClick={toggleAudio} className='hidden-button'></button>
@@ -1292,9 +1263,8 @@ export function ConsolePage() {
                 iconPosition={'start'}
                 icon={isPlaying ? Pause : Play}
                 buttonStyle={'regular'}
-                onClick={
-                  isPlaying ? toggleAudio : toggleAudio
-                }
+                onClick={toggleAudio}
+                className='button'
               />
         <div 
           ref={progressBarRef}
@@ -1355,9 +1325,10 @@ export function ConsolePage() {
           <div className="tooltip">
             <strong className='tooltip-title'>Turn on/off microphone</strong><br />
             {!isConnected && <>The <span className="highlightred">first</span> turning on will start the Audio Copilot.<br /><br /> </>}
+            {isConnected && <><br /> </>}
           </div>            
         </div> 
-        <div style={{ fontSize: '1.2em' }}>{isConnected ? ( <> Copilot is <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Connection error</span> occurred</> ) : ( <> Copilot is <span className="highlightred">Off</span> </> )) )}</div>
+        <div style={{ fontSize: '1.1em' }}>{isConnected ? ( <> Copilot is <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Connection error</span> occurred</> ) : ( <> Copilot is <span className="highlightred">Off</span> </> )) )}</div>
         <div className="content-api-key-1">
           {!LOCAL_RELAY_SERVER_URL && (
             <Button

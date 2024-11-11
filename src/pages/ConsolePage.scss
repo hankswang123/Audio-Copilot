@@ -68,6 +68,10 @@
     box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
   } 
 
+  .button-row .button {
+    margin-right: 0px; /* Adjust this value as needed */
+  }  
+
   .content-api-key-1 {
     //visibility: hidden;
     //visibility:visible;
