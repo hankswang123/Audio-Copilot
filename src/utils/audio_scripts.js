@@ -56,8 +56,215 @@ export const audioScripts1 = `
     2:10
     So over 80% of the task will be completely automated by SAP Business AI.
 `
-
+// The scrpits are transcribed from the audio file by: https://app.fireflies.ai/
+// https://app.fireflies.ai/view/Audio-National-Geographic-Little-Kids-USA-September-October-2024-wav::p7nw1uI0Q4bVzsIE
 export const audioScripts = `
+Speaker 1: 00:00 
+ Welcome to our deep dive, everyone. Today we're going to be talking all about animals.
+
+Speaker 2: 00:03 
+ Oh, I love animals. Are we going to see some cool pictures?
+
+Speaker 1: 00:07 
+ Yes, we are going to see some cool pictures and learn some new words, too.
+
+Speaker 2: 00:10 
+ Awesome. I'm ready.
+
+Speaker 1: 00:11 
+ Okay, so first, let's look at this owl.
+
+Speaker 2: 00:14 
+ Ooh. Look at its big eyes.
+
+Speaker 1: 00:16 
+ Yeah, Owls have really big eyes. They need them to see at night.
+
+Speaker 2: 00:20 
+ Why do they need to see at night? Is that when they hunt?
+
+Speaker 1: 00:22 
+ That's right. Owls sleep during the day and they wake up at night to hunt.
+
+Speaker 2: 00:26 
+ What do they hunt for?
+
+Speaker 1: 00:26 
+ They hunt for small animals like mice and voles.
+
+Speaker 2: 00:29 
+ Those owls are so cool. So where do these owls live?
+
+Speaker 1: 00:32 
+ These owls live in England.
+
+Speaker 2: 00:34 
+ England? Can you point to England on the map for me?
+
+Speaker 1: 00:38 
+ Sure. England is this island right here. Can you say England?
+
+Speaker 2: 00:41 
+ England.
+
+Speaker 1: 00:42 
+ Great job. Yeah. Okay, now, look at this funny little animal.
+
+Speaker 2: 00:45 
+ It's pink and it has a shell.
+
+Speaker 1: 00:48 
+ That's right. This is a Pink Fairy armadillo.
+
+Speaker 2: 00:52 
+ Pink Fairy armadillo. Wow, that's a big word.
+
+Speaker 1: 00:55 
+ Can you say armadillo?
+
+Speaker 2: 00:56 
+ Armadillo. That's hard to say.
+
+Speaker 1: 00:57 
+ You got it. Now, this armadillo is very, very small. It's only about as long as your hand.
+
+Speaker 2: 01:02 
+ Wow, that's tiny.
+
+Speaker 1: 01:03 
+ And see that shell on its back? That shell helps protect the armadillo from danger.
+
+Speaker 2: 01:09 
+ Oh, like a little shield.
+
+Speaker 1: 01:10 
+ Yeah, just like a little shield. And look at those big claws.
+
+Speaker 2: 01:13 
+ I see them. What are those for?
+
+Speaker 1: 01:15 
+ It uses those claws to dig tunnels in the sand.
+
+Speaker 2: 01:18 
+ Tunnels? Why does it need tunnels?
+
+Speaker 1: 01:20 
+ It lives in those tunnels. That's where it sleeps and hides from predators.
+
+Speaker 2: 01:23 
+ That's pretty smart.
+
+Speaker 1: 01:24 
+ Yeah.
+
+Speaker 2: 01:24 
+ So where does this Pink Fairy armadillo live?
+
+Speaker 1: 01:27 
+ This Pink Fairy armadillo lives in Argentina.
+
+Speaker 2: 01:29 
+ Argentina. Can you point to that on the map too, please?
+
+Speaker 1: 01:32 
+ Of course. Argentina's way down here in South America. See?
+
+Speaker 2: 01:36 
+ Oh, wow. That's far away.
+
+Speaker 1: 01:38 
+ Now, let's talk about colors. What color is this parrot?
+
+Speaker 2: 01:41 
+ Orange.
+
+Speaker 1: 01:42 
+ Yep. Can you think of other things that are orange?
+
+Speaker 2: 01:45 
+ Hmm, let me think. Pumpkins are orange.
+
+Speaker 1: 01:49 
+ Good one.
+
+Speaker 2: 01:50 
+ Oh, and basketballs are orange.
+
+Speaker 1: 01:51 
+ That's right. Okay, now, look at this cute little baby.
+
+Speaker 2: 01:54 
+ Oh, it's a baby monkey.
+
+Speaker 1: 01:55 
+ Yes. It's a baby orangutan with its mommy.
+
+Speaker 2: 01:58 
+ Orangutan. What's an orangutan?
+
+Speaker 1: 02:01 
+ An orangutan is a type of ape. They live in the rainforest, and they are very good at climbing trees.
+
+Speaker 2: 02:06 
+ Wow. Why is the baby holding onto its mommy?
+
+Speaker 1: 02:09 
+ Baby orangutans stay with their mommies for a long time. The mommies teach Them everything they need to know about surviving in the rainforest.
+
+Speaker 2: 02:16 
+ That's nice. They learn how to climb trees and find food?
+
+Speaker 1: 02:19 
+ Yep. They even learn how to build nests in the trees then.
+
+Speaker 2: 02:23 
+ Nests? Like birds?
+
+Speaker 1: 02:24 
+ Yeah, kind of like birds. They make their nests out of leaves and branches high up in the trees.
+
+Speaker 2: 02:29 
+ Cool. So where do these orangutans live?
+
+Speaker 1: 02:31 
+ Orangutans live on the islands of Borneo and Sumatra.
+
+Speaker 2: 02:35 
+ Borneo and Sumatra. I don't know where those are.
+
+Speaker 1: 02:38 
+ Let me show you on the map. Borneo and Sumatra are these islands right here in Southeast Asia.
+
+Speaker 2: 02:43 
+ Oh, I see.
+
+Speaker 1: 02:44 
+ Okay, are you ready for a game?
+
+Speaker 2: 02:45 
+ Yes. I love games. What game are we gonna play?
+
+Speaker 1: 02:48 
+ We are gonna play a matching game. Look at this walrus that has a funny thing on its face. It's called a mustache.
+
+Speaker 2: 02:55 
+ A mustache. Can I try to spell that word?
+
+Speaker 1: 02:57 
+ Sure.
+
+Speaker 2: 02:58 
+ M U S T A C H e. Mustache.
+
+Speaker 1: 03:02 
+ You got it. Now, look at this porcupine. What are those sharp, pointy things on its back?
+
+Speaker 2: 03:07 
+ Those look pokey. What are they called?
+`
+
+export const audioScripts2 = `
 00:00 
  Welcome to our deep dive, everyone. Today we're going to be talking all about animals.
 

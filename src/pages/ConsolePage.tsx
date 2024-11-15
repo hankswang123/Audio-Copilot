@@ -27,7 +27,8 @@ import { Map } from '../components/Map';
 import './ConsolePage.scss';
 import { isJsxOpeningLikeElement } from 'typescript';
 import e from 'express';
-import { audioCaptions } from '../utils/audio_captions.js';
+//import { audioCaptions } from '../utils/audio_captions.js';
+import { audioCaptions } from '../utils/scripts2captions.js';
 
 //import nodemailer from 'nodemailer';
 /**
@@ -511,7 +512,6 @@ export function ConsolePage() {
       // Connect to realtime API
       // debug finding: even without API_KEY is not set, the connection is still established
       // websocket connection is established, but the API_KEY is not set
-
   
       const apiKey = LOCAL_RELAY_SERVER_URL
         ? ''
@@ -520,8 +520,7 @@ export function ConsolePage() {
           '';
       if (apiKey !== '') {
         localStorage.setItem('tmp::voice_api_key', apiKey);
-      }      
-      if (apiKey !== '') {
+
         client.realtime.apiKey = apiKey;
         await client.connect();
       } else {

@@ -1,6 +1,6 @@
 {
     "version": "0.2.0",
-    "configurations": [
+    "configurations": [      
       {
         "name": "Chrome",
         "type": "chrome",
@@ -9,6 +9,14 @@
         "webRoot": "${workspaceFolder}/src",
         "sourceMaps": true,
         "trace": true
+      },
+      {
+          "name": "Debug Transcribe Script",
+          "type": "node",
+          "request": "launch",
+          "program": "${workspaceFolder}/src/util/fetch_scripts.js", // Path to transcribe.js
+          "skipFiles": ["<node_internals>/**"],
+          "console": "integratedTerminal"
       }
     ]
   }
