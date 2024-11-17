@@ -6,7 +6,7 @@ Audio Copilot enables the interaction with content during playback on-going. It 
 - Control the player by voice commands. e.g. 'stop', 'resume'...
 - Search News by google integrated by SERPAPI
 
-## An Education Scenarion which Audio Copilot could help 
+## An Education Scenario which Audio Copilot could help 
 ### Whole process
 - Step 1 - Preapre the PDF file from [National Geographic Little Kids](https://magazinelib.com/?s=national+geographic+little+kids)
 - Step 2 - Generate the podcast by uploading PDF to [NotebookLM](https://notebooklm.google.com/)
