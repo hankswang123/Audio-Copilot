@@ -29,6 +29,7 @@ import { isJsxOpeningLikeElement } from 'typescript';
 import e from 'express';
 //import { audioCaptions } from '../utils/audio_captions.js';
 import { audioCaptions } from '../utils/scripts2captions.js';
+import { pdfFilePath, audioFilePath } from '../filePaths.js'; // Import the file paths
 
 //import nodemailer from 'nodemailer';
 /**
@@ -232,11 +233,8 @@ export function ConsolePage() {
   };  
 
   useEffect(() => {
-    audioRef.current = new Audio('./audio/ngl_sep_lite.mp3');
-    //audioRef.current = new Audio('./audio/ngl_sep.wav');
-    //audioRef.current = new Audio('./audio/ck_interview.mp3');
-    //audioRef.current = new Audio('./audio/sap_news_jack.wav');
-    //audioRef.current = new Audio('./audio/sap_new_notbooklm.wav');
+    audioRef.current = new Audio(audioFilePath);
+    //audioRef.current = new Audio('./audio/ngl_issue23_uk.wav');
 
     //audioRef.current.onplay
     //videoRef.current = new Video('./video/ck_interview.mp4');
@@ -280,14 +278,76 @@ export function ConsolePage() {
         setCurrentTime(audio.currentTime);
       }
     };
+
+    interface Caption {
+      text: string;
+      time: number;
+    }
+
+    interface WordTiming {
+      word: string;
+      startTime: number;
+      endTime: number;
+    }
+
+    const splitCaptionIntoWords = (caption: Caption, nextCaptionTime?: number): WordTiming[] => {
+      const words = caption.text.split(' ');
+      //const words = caption.text.split(/(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\w)\s/); // Preserve phrases
+
+      // Calculate duration based on the next caption or assume a default duration
+      const duration = nextCaptionTime ? nextCaptionTime - caption.time : 2; // Assume 2 seconds for the last caption
+      const wordDuration = duration / words.length; // Evenly distribute word timing
+
+      return words.map((word, index) => ({
+      word,
+      startTime: caption.time + index * wordDuration,
+      endTime: caption.time + (index + 1) * wordDuration,
+      }));
+    };
     
     const updateCaption = () => {
+      /* prevous logic four update caption without word highlighting
       const currentTime = audio.currentTime;
       const currentCaption = audioCaptions.find((caption, index) => {
         const nextCaption = audioCaptions[index + 1];
         return currentTime >= caption.time && (!nextCaption || currentTime < nextCaption.time);
       });
-      setCurrentCaption(currentCaption ? currentCaption.text : '');     
+      setCurrentCaption(currentCaption ? currentCaption.text : '');     */
+
+      const currentTime = audio.currentTime;
+
+      // Find the current caption
+      const currentCaptionIndex = audioCaptions.findIndex((caption, index) => {
+        const nextCaption = audioCaptions[index + 1];
+        return currentTime >= caption.time && (!nextCaption || currentTime < nextCaption.time);
+      });
+    
+      if (currentCaptionIndex !== -1) {
+        const currentCaption = audioCaptions[currentCaptionIndex];
+        const nextCaption = audioCaptions[currentCaptionIndex + 1];
+        const wordsWithTiming = splitCaptionIntoWords(currentCaption, nextCaption?.time);
+    
+        // Find the active word
+        const currentWord = wordsWithTiming.find(
+          (word, index) =>
+            currentTime >= word.startTime && currentTime < word.endTime ||
+            (index === 0 && currentTime < word.endTime) // Special case for the first word
+        );
+    
+        if (currentWord) {
+          // Highlight the active word
+          const highlightedCaption = wordsWithTiming
+            .map((word) =>
+              word === currentWord
+                ? ` <span style="border-radius: 4px; color: #00FFFF; font-weight: bold; display: inline-block; margin: 0 1px;">${word.word}</span> `
+                : ` <span style="display: inline; margin: 0 1px;">${word.word}</span> `
+            )
+            .join(' ');
+    
+          setCurrentCaption(highlightedCaption); // Update the UI
+        }
+      }
+
     };   
 
     const handleLoadedMetadata = () => {
@@ -360,7 +420,7 @@ export function ConsolePage() {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, []); // Empty dependency array to run only once on mount  
+  }, []);
 
   const toggleAudio = async () => {
     if (audioRef.current && isHidden) {
@@ -1178,19 +1238,6 @@ export function ConsolePage() {
         },
       ]);    */
       setIsConnected(true);
-      
-      /*
-      if (client.getTurnDetectionType() === 'server_vad' && client.isConnected()) {
-        await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-      } */   
-
-      /*
-      const intervalId = setInterval(() => {
-        if ('recording' === wavRecorderRef.current.getStatus()) {
-          clearInterval(intervalId);
-          setIsMuteBtnDisabled(false);
-        }
-      }, 100);*/
     });      
     // hanks
 
@@ -1215,11 +1262,23 @@ export function ConsolePage() {
       : `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
+  interface SpeedControlClickEvent extends React.MouseEvent<HTMLDivElement> {
+    stopPropagation: () => void;
+  }
+
+  const handleSpeedControlClick = (event: SpeedControlClickEvent, speed: number): void => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the progress bar
+
+    setPlaybackRate(speed);
+    console.log(`Speed set to ${speed}`);
+  };
+
   /**
    * Render the application
    */
   return (
     <div data-component="ConsolePage">
+      {/* Original top is hidden */}
       <div className="content-top">
         <div className="content-title">
           <img src="/resource/great_developer.jpg" />
@@ -1237,24 +1296,29 @@ export function ConsolePage() {
           )}
         </div>
       </div>
+      {/* Upper area to display PDF */}
       <div>
-        <object data="./resource/background_lite.pdf" type="application/pdf" width="100%" height="672px">
-          {<p>Your browser does not support PDFs. <a href="./resource/background_lite.pdf">Download the PDF</a>.</p> }
+        <object data={pdfFilePath} type="application/pdf" width="100%" height="672px">
+          {<p>Your browser does not support PDFs. <a href={pdfFilePath}>Download the PDF</a>.</p> }
         </object>        
       </div>
-      {/* Add a div to display the current caption */}
-      {isCaptionVisible && (
-        <div className="caption-display">
-          {currentCaption}
-        </div>
-      )}      
+      {/* Bellow toolbar area to display different buttons, captions, progress bar, mute/unmute button */}
       <div className='button-row'>
-        <Button
-              label={isCaptionVisible ? 'Hide Captions' : 'Show Captions'}
-              buttonStyle={'regular'}
-              onClick={toggleCaptionVisibility}
-              className='button'
-            />  
+        {/* Add a div to display the current caption */}
+        {isCaptionVisible && ( 
+          <div className="caption-display"
+              dangerouslySetInnerHTML={{ __html: currentCaption }}
+              style={{ fontSize: '1.5em', marginTop: '20px' }}
+          ></div> )
+        }           
+        <div className="content-caption">
+          <Button
+                label={isCaptionVisible ? 'Hide Captions' : 'Show Captions'}
+                buttonStyle={'regular'}
+                onClick={toggleCaptionVisibility}
+                className='button'
+              />  
+        </div>
         {/* This hidden button is to receive space bar down event to play/pause the audio */}
         <button ref={playPauseBtnRef} onClick={toggleAudio} className='hidden-button'></button>
         <Button
@@ -1264,68 +1328,74 @@ export function ConsolePage() {
                 buttonStyle={'regular'}
                 onClick={toggleAudio}
                 className='button'
-              />
+        />
         <div 
           ref={progressBarRef}
-          style={{position: 'relative', width: '45%', backgroundColor: '#ccc', height: '10px', borderRadius: '10px', marginTop: '10px', marginLeft: '-16px' }}
-          onMouseDown={handleMouseDown}
-        >
-        <div
-          style={{
-            width: `${progress}%`,
-            backgroundColor: '#007bff',
-            height: '10px',
-            borderRadius: '10px',
-          }}
-        />
-        {/* Display the current play time */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '-24px', // Adjust as needed
-            left: `${progress}%`, // Move with the progress bar
-            transform: 'translateX(-20%)', // Center the text
-            backgroundColor: 'rgba(255, 255, 255, 0)',
-            color: 'rgba(0, 0, 0, 0.7)',
-            padding: '5px',
-            borderRadius: '5px',
-            fontSize: '0.9em',
-          }}
-        >
-          {formatDuration({time: currentTime})}
-        </div>          
-        {/* Display the total duration */}
-        <div className="audio-duration">
-          {formatDuration({time: totalDuration})}
-        </div>          
-        </div>    
-        {/* Hide the audio copilot Toggle component and set it on by default */}    
-        {false && (            
-          <Toggle
-            defaultValue={true}
-            labels={['\u00A0', 'Audio Copilot']}
-            values={['none', 'server_vad']}
-            onChange={(_, value) => switchAudioCopilot(value)}
+          style={{position: 'relative', width: '60%', backgroundColor: '#ccc', height: '0.625em', borderRadius: '0.3125em', marginTop: '0.2em', marginLeft: '-1px' }}
+          onMouseDown={handleMouseDown}>
+          <div
+            style={{
+              width: `${progress}%`,
+              backgroundColor: '#007bff',
+              height: '0.625em',
+              borderRadius: '0.3125em'
+            }}
           />
-        )}
-        <div className="container">
+          <div className="speed-controls" onMouseDown={(e) => {
+                                                                e.stopPropagation(); // Prevent event from reaching the progress bar
+                                                              }}>
+            <div className="speed-control" style={{ 
+              backgroundColor: playbackRate === 0.85 ? '#666' : '#ccc', // Darker if active
+              color: playbackRate === 0.85 ? '#fff' : '#000', // Adjust text color for contrast
+              borderRadius: '0.3125em',
+            }}  onClick={(e) => handleSpeedControlClick(e, 0.85)}>Slower</div>
+            <div className="speed-control"         style={{
+              backgroundColor: playbackRate === 1.0 ? '#666' : '#ccc', // Darker if active
+              color: playbackRate === 1.0 ? '#fff' : '#000', // Adjust text color for contrast
+              borderRadius: '0.3125em',
+            }}    onClick={(e) => handleSpeedControlClick(e, 1.0)}>Normal</div>
+            <div className="speed-control"         style={{
+              backgroundColor: playbackRate === 1.2 ? '#666' : '#ccc', // Darker if active
+              color: playbackRate === 1.2 ? '#fff' : '#000', // Adjust text color for contrast
+              borderRadius: '0.3125em',
+            }}    onClick={(e) => handleSpeedControlClick(e, 1.2)}>Faster</div>        
+          </div>
+          {/* Display the current play time */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '-2em', // Adjust as needed
+              left: `${progress}%`, // Move with the progress bar
+              transform: 'translateX(-20%)', // Center the text
+              backgroundColor: 'rgba(255, 255, 255, 0)',
+              color: 'rgba(0, 0, 0, 0.7)',
+              padding: '0.3125em',
+              borderRadius: '0.3125em',
+              fontSize: '0.9em',
+            }}>
+            {formatDuration({time: currentTime})}
+          </div>          
+          {/* Display the total duration */}
+          <div className="audio-duration">
+            {formatDuration({time: totalDuration})}
+          </div>          
+        </div>    
+        <div className="mute-container">
           <Button
               label={isMuted ? '' : ''}
               iconPosition={'start'}
               icon={isMuted ? MicOff : Mic}
               disabled={isMuteBtnDisabled}
               buttonStyle={'regular'}
-              onClick={
-                isMuted ? toggleMuteRecording : toggleMuteRecording
-              }
+              onClick={toggleMuteRecording}
             />
           <div className="tooltip">
             <strong className='tooltip-title'>Turn on/off microphone</strong><br />
             {!isConnected && <>The <span className="highlightred">first</span> turning on will start the Audio Copilot.<br /><br /> </>}
             {isConnected && <><br /> </>}
           </div>            
-        </div> 
-        <div style={{ fontSize: '1.1em' }}>{isConnected ? ( <> Copilot is <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Connection error</span> occurred</> ) : ( <> Copilot is <span className="highlightred">Off</span> </> )) )}</div>
+        </div>         
+        <div style={{ fontSize: '1em' }}>{isConnected ? ( <> Copilot is <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Connection error</span> occurred</> ) : ( <> Copilot is <span className="highlightred">Off</span> </> )) )}</div>
         <div className="content-api-key-1">
           {!LOCAL_RELAY_SERVER_URL && (
             <Button
@@ -1338,7 +1408,8 @@ export function ConsolePage() {
             />
           )}
         </div>        
-      </div>      
+      </div>   
+      {/* Original content is hidden */}
       <div className="content-main">
         <div className="content-logs">
           <div className={isHidden ? 'content-block conversation-display' : 'content-block conversation'}>

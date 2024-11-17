@@ -1,3 +1,7 @@
+/**
+ * Running this service by node server.js will start the server on port 3001
+ * The server will listen for requests to /api/news and fetch news articles from Google News using the SERPAPI API
+ */
 import 'dotenv/config'; // Auto-loads environment variables
 import express from 'express';
 import cors from 'cors';

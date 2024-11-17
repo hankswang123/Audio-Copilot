@@ -18,17 +18,33 @@
   }
 
   .caption-display {
-    display: flex;
+    //display: flex;
+    display: block;
     position: fixed;
+    //position: absolute;
     bottom: 48px;
     width: 100%;
-    text-align: center;
+    text-align: left;
     font-size: 2.5em;
-    background-color: rgba(0, 0, 0, 0.466);
+    background-color: rgba(0, 0, 0, 0.311);
     z-index: 2000;
     color: white;
     padding: 10px;
-    border-radius: 5px;
+    border-radius: 5px; 
+    white-space: normal; /* Allow natural wrapping */
+    overflow-wrap: break-word; /* Enable word wrapping only for long, unbreakable words */
+    word-break: normal; /* Prevent unnecessary word breaking */   
+    //line-height: 1.5; /* Improve spacing between lines */
+    word-spacing: -5px; /* Decrease space between words */
+    letter-spacing: 0px; /* Keep letters evenly spaced */
+  //  text-align: center; /* Center-align the text */    
+  }  
+
+  .caption-display span {
+    display: inline-block;
+    white-space: normal; /* Prevent breaking within spans */
+    margin: 0 1px; /* Optional: Add some spacing between words */
+    word-spacing: -5px; /* Decrease space between words */
   }  
 
   .hidden-button {
@@ -45,32 +61,61 @@
 
   .audio-duration {
     position: absolute;
-    top: -24px; /* Adjust as needed */
+    top: -2em; /* Adjust as needed */
     right: 0;
     background-color: white;
     color:  rgba(0, 0, 0, 0.7);
-    padding: 5px;
-    border-radius: 5px;
+    padding: 0.3125em;
+    border-radius: 0.3125em;
     font-size: 0.9em;
   }  
 
   .button-row {
     display: flex;
+    //flex-wrap: wrap;
+    //justify-content: space-between;    
     flex-grow: 1;
-    gap: 16px; /* Space between buttons */
+    //gap: 16px; /* Space between buttons */
+    gap: 0.1em; /* Space between buttons */
     align-items: center; /* Align items vertically in the center */    
     position: fixed;
+    //position: absolute;
     bottom: 0; /* Adjust this value to position the button row at the bottom */
     width: 100%; /* Make it span the full width of the viewport */
     background-color: white; /* Optional: Set a background color to make it stand out */
     z-index: 1000; /* Ensure it appears above other content */
-    padding: 3px; /* Optional: Add some padding */
-    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
+    //padding: 3px; /* Optional: Add some padding */
+    padding: 0.5em; /* Optional: Add some padding */
+    //box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
+    box-shadow: 0 -0.125em 0.3125em rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
   } 
 
   .button-row .button {
+    font-size: 1em; /* Use em for font size */
+    padding: 0.5em 1em; /* Use em for padding */    
     margin-right: 0px; /* Adjust this value as needed */
   }  
+
+  @media (max-width: 600px) {
+    .button-row {
+      flex-direction: column; /* Stack buttons vertically on small screens */
+      gap: 0.5em; /* Adjust gap for small screens */
+    }
+  
+    .button-row .button {
+      font-size: 0.9em; /* Adjust font size for small screens */
+      padding: 0.4em 0.8em; /* Adjust padding for small screens */
+    }
+  }  
+
+  .content-caption {
+    //visibility: hidden;
+    //visibility:visible;
+    display: flex;
+    justify-content: flex-start;      
+    margin-left: 0 !important;
+    padding-left: 0 !important; /* Ensure no padding on the left */
+  }     
 
   .content-api-key-1 {
     //visibility: hidden;
@@ -79,6 +124,23 @@
     justify-content: flex-end;      
     margin-left: auto;
   }   
+
+  .speed-controls {
+    display: flex;
+    justify-content: flex-start;
+    gap: 0.5em; /* Adjust as needed */
+    width: 20%;
+    margin-top: 0.2em; /* Adjust as needed */
+  }
+  
+  .speed-control {
+    font-size: 0.8em; /* Adjust as needed */
+    padding: 0.2em 0.5em; /* Adjust as needed */
+    background-color: #f0f0f0;
+    border-radius: 0.25em;
+    cursor: pointer;
+    text-align: center;
+  }  
 
   .content-top {
     //display: flex;
@@ -112,7 +174,7 @@
     flex-shrink: 1 !important;
     margin: 0px 16px;
     //display: flex;
-    display: none;
+    display: none; //hide the orginal content
     overflow: hidden;
     margin-bottom: 24px;
     .content-block {
@@ -234,7 +296,7 @@
     }
   }
 
-  .container {
+  .mute-container {
     position: relative;
     display: inline-block;
     z-index: 9998;
@@ -277,7 +339,7 @@
     border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent; /* Arrow color */
   }  
 
-  .container:hover .tooltip {
+  .mute-container:hover .tooltip {
     visibility: visible;
     opacity: 1;
   }  

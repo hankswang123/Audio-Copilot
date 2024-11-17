@@ -36,7 +36,9 @@
     "ws": "^8.18.0"
   },
   "scripts": {
+    "prestart": "node generateFilePaths.js",    
     "start": "react-scripts start",
+    "prebuild": "node generateFilePaths.js",    
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",

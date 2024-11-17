@@ -1,3 +1,9 @@
+//import { audioScripts } from './audio_scripts.js';
+/**
+ * This function will generate the audioCaptions used by runtime
+ * This will reduce the effort of manually creating the audioCaptions
+ */
+//import { audioScripts } from './audio_scripts/audio_scripts.js';
 import { audioScripts } from './audio_scripts.js';
 
 // Function to transform the script into the desired format to be used as audioCaptions
