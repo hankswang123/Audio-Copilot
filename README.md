@@ -15,4 +15,7 @@ Audio Copilot enables the interaction with content during playback on-going. It 
 
 <img src="/readme/audio-copilot.png" width="800" />
 
-This idea is implemented based on [OpenAI Realtime Console](https://github.com/openai/openai-realtime-console)
+This idea is implemented based on [OpenAI Realtime Console](https://github.com/openai/openai-realtime-console)<br>
+## Issues solved
+- put 'fnm env --use-on-cd | Out-String | Invoke-Expression' to 'C:\Users\<YourUsername>\Documents\WindowsPowerShell\profile.ps1' to avoid run this command each time before 'npm start'
+- install 'concurrently' as dependency to start the 'server.js' and react app(react-scripts start) are started together

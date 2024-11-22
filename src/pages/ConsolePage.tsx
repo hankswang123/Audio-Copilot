@@ -799,7 +799,9 @@ function convertToEmbedUrl(url: string): string | null {
         : localStorage.getItem('tmp::voice_api_key') ||
           prompt('OpenAI API Key') ||
           '';
-      if (apiKey !== '') {
+      if(LOCAL_RELAY_SERVER_URL !== '') {
+          await client.connect();
+      } else if (apiKey !== '') {
         localStorage.setItem('tmp::voice_api_key', apiKey);
 
         client.realtime.apiKey = apiKey;

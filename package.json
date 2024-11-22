@@ -6,7 +6,7 @@
   "how_to_set_homepage": "Check following two entries",
   "local_run_by_npm_start": "homepage should be deleted or changed to, e.g. homepage_",
   "gh-pages_by_npm_run_deploy": "homepage should be set to the gh-pages url as bellow",
-  "homepage_": "https://hankswang123.github.io/Audio-Copilot/",
+  "homepage": "https://hankswang123.github.io/Audio-Copilot/",
   "dependencies": {
     "@openai/realtime-api-beta": "github:openai/openai-realtime-api-beta",
     "@testing-library/jest-dom": "^5.17.0",
@@ -36,16 +36,16 @@
     "ws": "^8.18.0"
   },
   "scripts": {
-    "prestart": "node generateFilePaths.js",    
-    "start": "react-scripts start",
-    "prebuild": "node generateFilePaths.js",    
+    "prestart": "node generateFilePaths.js",
+    "start": "concurrently \"nodemon ./relay-server/index.js\" \"react-scripts start\" \"nodemon server.js\"",
+    "prebuild": "node generateFilePaths.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "zip": "zip -r realtime-api-console.zip . -x 'node_modules' 'node_modules/*' 'node_modules/**' '.git' '.git/*' '.git/**' '.DS_Store' '*/.DS_Store' 'package-lock.json' '*.zip' '*.tar.gz' '*.tar' '.env'",
     "relay": "nodemon ./relay-server/index.js",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"    
+    "deploy": "gh-pages -d build"
   },
   "eslintConfig": {
     "extends": [
@@ -68,6 +68,7 @@
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@types/nodemailer": "^6.4.16",
+    "concurrently": "^9.1.0",
     "nodemon": "^3.1.7"
   }
 }

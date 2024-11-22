@@ -12,7 +12,7 @@ const port = process.env.PORT || 3001;
 
 // CORS settings
 app.use(cors({
-    origin: 'http://localhost:3000', // React app URL
+    origin: ['http://localhost:3000', 'https://hankswang123.github.io/'], // React app URL
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -66,6 +66,7 @@ app.get("/api/videos", async (req, res) => {
         //const videoResults = response.data.news_results;
         //console.log(response);
         const videoResults = response.data.video_results;
+        console.log("Video results:");
         console.log(videoResults);
         res.json(videoResults);
     } catch (error) {
