@@ -46,6 +46,34 @@ app.get("/api/news", async (req, res) => {
     }
 });
 
+app.get("/api/videos", async (req, res) => {
+    try {
+        const { q } = req.query;
+        const apikey = process.env.SERPAPI_API_KEY;
+
+        if (!apikey) {
+            throw new Error("SERPAPI API key is not set");
+        }
+
+        const response = await axios.get('https://serpapi.com/search', {
+            params: {
+                engine: "youtube",
+                search_query: q,
+                api_key: apikey
+            }
+        });
+
+        //const videoResults = response.data.news_results;
+        //console.log(response);
+        const videoResults = response.data.video_results;
+        console.log(videoResults);
+        res.json(videoResults);
+    } catch (error) {
+        console.error("Detailed error:", error);
+        res.status(600).json({ error: 'Failed to fetch videos from youtube', details: error.message });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });

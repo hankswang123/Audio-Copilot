@@ -4,7 +4,7 @@ Audio Copilot enables the interaction with content during playback on-going. It 
 ## Functions implemented
 - Audio Copilot. ( Key feature: Interrupt the on-going playback and ask for questions by integrating [OpenAI Realtime API](https://openai.com/index/introducing-the-realtime-api/) )
 - Control the player by voice commands. e.g. 'stop', 'resume'...
-- Search News by google integrated by SERPAPI
+- Search News by google integrated by [SERPAPI](https://serpapi.com/search-api)
 
 ## An Education Scenario which Audio Copilot could help 
 ### Whole process

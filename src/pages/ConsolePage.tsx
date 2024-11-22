@@ -74,6 +74,8 @@ export function ConsolePage() {
     localStorage.setItem('tmp::voice_api_key', apiKey);
   }*/
 
+    let animation: NodeJS.Timeout;    
+
   //Comment out orinial API Key Prompt and 
   //Postpone the Prompt to first unmute click(will enable audio copilot)
   const apiKey = '';
@@ -154,6 +156,39 @@ export function ConsolePage() {
   const playPauseBtnRef = useRef<HTMLButtonElement>(null); // Add a ref for the play/pause button
   const audioRef = useRef<HTMLAudioElement | null>(null);  
   const videoRef = useRef<HTMLVideoElement | null>(null);  
+  /*
+  const playerRef = useRef(null); // Ref to hold the YT.Player instance
+  useEffect(() => {
+
+    playerRef = new YT.Player('videoFrame', {
+  });    
+
+  }, []);
+  
+  useEffect(() => {
+    // Dynamically load the YouTube IFrame API script
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    script.async = true;
+    document.body.appendChild(script);
+
+    // Create the player when the script is loaded
+    (window as any).onYouTubeIframeAPIReady = () => {
+        playerRef.current = new window.YT.Player("videoFrame", {
+            videoId: "dQw4w9WgXcQ", // Replace with your video ID
+            events: {
+                onReady: onPlayerReady,
+                onStateChange: onPlayerStateChange,
+            },
+        });
+    };
+
+      // Cleanup script when the component unmounts
+      return () => {
+          document.body.removeChild(script);
+          delete window.onYouTubeIframeAPIReady; // Clean up global function
+      };
+  }, []);  */
 
   /* Try to addTool for sending mail by voice
   // Create a transporter object
@@ -339,7 +374,7 @@ export function ConsolePage() {
           const highlightedCaption = wordsWithTiming
             .map((word) =>
               word === currentWord
-                ? ` <span style="border-radius: 4px; color: #00FFFF; font-weight: bold; display: inline-block; margin: 0 1px;">${word.word}</span> `
+                ? ` <span style="border-radius: 4px; color: #00FFFF; display: inline-block; margin: 0 1px;">${word.word}</span> `
                 : ` <span style="display: inline; margin: 0 1px;">${word.word}</span> `
             )
             .join(' ');
@@ -396,6 +431,54 @@ export function ConsolePage() {
       }
     };
 
+/**
+ * Converts a standard YouTube video URL to an embeddable URL.
+ * @param {string} url - The original YouTube video URL.
+ * @returns {string | null} - The embeddable YouTube URL or null if invalid.
+ */
+function convertToEmbedUrl(url: string): string | null {
+  // Regular expression to extract the video ID from the URL
+  const videoIdMatch = url.match(/(?:youtube\.com\/.*v=|youtu\.be\/)([^&]+)/);
+  
+  // Check if a video ID was found
+  if (videoIdMatch && videoIdMatch[1]) {
+    const videoId = videoIdMatch[1];
+    // Construct and return the embed URL
+    return `https://www.youtube.com/embed/${videoId}`;
+  } else {
+    // Return null if the URL is not a valid YouTube video URL
+    return null;
+  }
+}    
+
+  //Display the Video Popup
+  useEffect(() => {
+
+    const closeButton = document.getElementById('closePopup');
+    const popupOverlay = document.getElementById('videoPopup');
+    const videoFrame = document.getElementById('videoFrame');  
+    const searchBox = document.getElementById('searchBox');  
+
+    if( closeButton && popupOverlay && videoFrame && searchBox) { 
+
+    // Close the popup and stop the video
+      closeButton.addEventListener('click', () => {
+        (videoFrame as HTMLIFrameElement).src = '';
+        popupOverlay.style.display = 'none';
+
+        (searchBox as HTMLInputElement).value = ''; // Clear the search box
+      });
+
+    }    
+
+    return () => {
+      //openButton.removeEventListener('mousemove', handleMouseMove);
+      //closeButton.removeEventListener('mouseup', handleMouseUp);
+      //popupOverlay.removeEventListener('click', (event) => {
+    };       
+
+  }, []);      
+
   useEffect(() => {
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
@@ -405,15 +488,54 @@ export function ConsolePage() {
     };
   }, [isDragging]);  
 
+  // Keydown event handling
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+
+      const searchBox = document.getElementById('searchBox');        
+      
       if (e.code === 'Space') {
-        e.preventDefault(); // Prevent default space bar action (scrolling)
-        if (playPauseBtnRef.current) {
-          playPauseBtnRef.current.click(); // Trigger the button click event
-        }        
-      }
-    };
+        if (e.target !== searchBox) {
+          e.preventDefault(); // Prevent default space bar action (scrolling)
+          if (playPauseBtnRef.current) {
+            playPauseBtnRef.current.click(); // Trigger the button click event
+          }      
+        }  
+      } else if (e.code === 'Escape') {
+        // Close the popup when pressing the Escape key
+        const popupOverlay = document.getElementById('videoPopup');
+        if (popupOverlay) {
+          const videoFrame = document.getElementById('videoFrame');
+          if (videoFrame) {
+            (videoFrame as HTMLIFrameElement).src = '';
+          }
+          popupOverlay.style.display = 'none';
+
+          (searchBox as HTMLInputElement).value = ''; // Clear the search box
+
+        }
+      }else if (e.code === 'Enter') { 
+        // When Enter is hit in the search box, search for the video       
+        if (e.target === searchBox) {
+          e.preventDefault();
+
+          const searchValue = (searchBox as HTMLInputElement).value.trim();
+          if (searchValue !== '') {
+              if (searchBox) {
+                searchBox.blur();                
+                setTimerforSearchBox(searchValue);
+                /*
+                if(isPlaying){
+                  if (playPauseBtnRef.current) {
+                    playPauseBtnRef.current.click(); // Trigger the button click event
+                  }  
+                }*/
+              }
+              showVideofromYoutube(searchValue);
+            }
+          }        
+        }       
+      };
   
     document.addEventListener('keydown', handleKeyDown);
   
@@ -421,6 +543,33 @@ export function ConsolePage() {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
+
+  const setTimerforSearchBox = (searchValue: string) => {
+    const searchBox = document.getElementById('searchBox');
+
+    let count = 0;
+    const maxDots = 3;
+    const interval = 250; // Time in ms between updates
+    animation = setInterval(() => {
+        count = (count + 1) % (maxDots + 1); // Cycle between 0, 1, 2, 3
+        (searchBox as HTMLInputElement).value = searchValue + ".".repeat(count);
+    }, interval);       
+
+  }
+
+  const clearTimerforSearchBox = (info: string) => {
+
+    const searchBox = document.getElementById('searchBox');
+
+    if (animation) {
+      clearInterval(animation); // Stop the animation
+      if (searchBox) {
+        (searchBox as HTMLInputElement).style.color = 'red'; // Reset the color
+        (searchBox as HTMLInputElement).value = info; // Clear the search box
+      }
+    }    
+    
+  }
 
   const toggleAudio = async () => {
     if (audioRef.current && isHidden) {
@@ -479,6 +628,79 @@ export function ConsolePage() {
       ];
     }
   }  
+
+  /*
+  * Utility for search Videos by Youtube by addTool
+   */
+  const showVideofromYoutube = async (query: string) => {
+
+    const searchBox = document.getElementById('searchBox');
+    const popupOverlay = document.getElementById('videoPopup');
+    const videoFrame = document.getElementById('videoFrame');
+
+    performYoutubeSearch(query)
+    .then((results) => {
+      if (results.length > 0) {
+        // Access the first result
+        const firstResult = results[0];
+        console.log(`Title: ${firstResult.title}`);
+        console.log(`Original URL: ${firstResult.url}`);
+        
+        // Convert to embeddable URL
+        const embedUrl = convertToEmbedUrl(firstResult.url);
+        
+        if (embedUrl) {
+          console.log(`Embeddable URL: ${embedUrl}`);
+          (videoFrame as HTMLIFrameElement).src = embedUrl;
+          if (popupOverlay){
+            popupOverlay.style.display = 'flex';
+            clearTimerforSearchBox(query);
+          }
+        } else {
+          //clearTimerforSearchBox('Failed to convert to embeddable URL.');
+          clearTimerforSearchBox('Error occurred during video search.');
+          console.log('Failed to convert to embeddable URL.');
+        }
+      } else {
+        clearTimerforSearchBox('No results found.');
+        console.log('No results found.');
+      }
+    })
+    .catch((error) => {
+      clearTimerforSearchBox('Error occurred during YouTube search');
+      console.error('Error occurred during YouTube search:', error);
+    });                         
+
+  }
+  
+  /**
+   * Utility for search Videos by Youtube by addTool
+   */
+  async function performYoutubeSearch(query: string): Promise<Array<{ title: string, url: string }>> {
+    try {
+      const response: Response = await fetch(`http://localhost:3001/api/videos?q=${encodeURIComponent(query)}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const results: any = await response.json();
+      console.log('Search results:', results);
+
+      return results.map((item: any): { title: any; url: any } => ({
+        title: item.title,
+        url: item.link
+      }));
+    } catch (error) {
+      console.error('Error in performYoutubeSearch:', error);
+      return [
+        {
+          title: '',
+          url: ''
+        }
+      ];
+    }
+  }    
 
   const toggleMuteRecording = async () => {
     if (wavRecorderRef.current && clientRef.current) {
@@ -958,6 +1180,43 @@ export function ConsolePage() {
         return await performGoogleSearch(query);
       }
     );    
+    // hanks - Capabilities of Aduio Copilot
+    client.addTool(
+      { //Capabilities demo: when a listener wants to ask for a google search
+        name: 'youtube_search',
+        description:
+          'Performs a Youtube video search and returns the top 1 results.',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'The search query to be used.',
+            },           
+          },
+          required: ['query'],
+        },
+      },
+      async({ query }: { query: string }) => {
+
+        const searchBox = document.getElementById('searchBox');  
+        if (searchBox) {
+          (searchBox as HTMLInputElement).value = query; // Clear the search box
+
+          let count = 0;
+          const maxDots = 3;
+          const interval = 250; // Time in ms between updates
+          animation = setInterval(() => {
+              count = (count + 1) % (maxDots + 1); // Cycle between 0, 1, 2, 3
+              (searchBox as HTMLInputElement).value = query + ".".repeat(count);
+          }, interval);            
+
+        }        
+
+        await showVideofromYoutube(query);
+
+      }
+    );        
     client.addTool(
       { //Capabilities demo: to retrieve the latest stock for a given company
         //e.g. get_stock_price(company: 'SAP') when valuation of SAP is heard, 
@@ -1296,6 +1555,15 @@ export function ConsolePage() {
           )}
         </div>
       </div>
+
+      <button id="openPopup"  style={{display: 'none'}}>Play Video</button>
+      <div id="videoPopup" className="popup-overlay">
+        <div className="popup-content">
+          <span id="closePopup" className="close-button">&times;</span>
+          <iframe id="videoFrame" width="672" height="378" src="" allowFullScreen></iframe>
+        </div>
+      </div>
+
       {/* Upper area to display PDF */}
       <div>
         <object data={pdfFilePath} type="application/pdf" width="100%" height="672px">
@@ -1358,7 +1626,8 @@ export function ConsolePage() {
               backgroundColor: playbackRate === 1.2 ? '#666' : '#ccc', // Darker if active
               color: playbackRate === 1.2 ? '#fff' : '#000', // Adjust text color for contrast
               borderRadius: '0.3125em',
-            }}    onClick={(e) => handleSpeedControlClick(e, 1.2)}>Faster</div>        
+            }}    onClick={(e) => handleSpeedControlClick(e, 1.2)}>Faster</div>      
+            <div style={{position: 'fixed', transform:'translateX(150px)', bottom: '0px'}}><input className='dynamic-searchBox' type="text" id="searchBox" placeholder="Type and Press Enter to Search a Video" onFocus={() => { (document.getElementById('searchBox') as HTMLInputElement).value = ''; (document.getElementById('searchBox') as HTMLInputElement).style.color = 'blue'; }} /></div>  
           </div>
           {/* Display the current play time */}
           <div
