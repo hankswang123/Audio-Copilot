@@ -12,7 +12,7 @@ const port = process.env.PORT || 3001;
 
 // CORS settings
 app.use(cors({
-    origin: ['http://localhost:3000', 'https://hankswang123.github.io/'], // React app URL
+    origin: ['http://localhost:3000', 'https://hankswang123.github.io/Audio-Copilot/'], // React app URL
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
