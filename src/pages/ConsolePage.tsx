@@ -303,6 +303,31 @@ export function ConsolePage() {
     setIsCaptionVisible(!isCaptionVisible);
   };     
 
+  interface FormatTimeProps {
+    time: number;
+  }
+
+  const formatDuration = ({ time }: FormatTimeProps): string => {
+    const hours = Math.floor(time / 3600);
+    const minutes = Math.floor((time % 3600) / 60);
+    const seconds = Math.floor(time % 60);
+    return hours > 0
+      ? `${hours}:${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`
+      : `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
+  interface SpeedControlClickEvent extends React.MouseEvent<HTMLDivElement> {
+    stopPropagation: () => void;
+  }
+
+  const handleSpeedControlClick = (event: SpeedControlClickEvent, speed: number): void => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the progress bar
+
+    setPlaybackRate(speed);
+    console.log(`Speed set to ${speed}`);
+  };  
+
+  //Update the progress bar and current time when the audio is playing
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -341,14 +366,6 @@ export function ConsolePage() {
     };
     
     const updateCaption = () => {
-      /* prevous logic four update caption without word highlighting
-      const currentTime = audio.currentTime;
-      const currentCaption = audioCaptions.find((caption, index) => {
-        const nextCaption = audioCaptions[index + 1];
-        return currentTime >= caption.time && (!nextCaption || currentTime < nextCaption.time);
-      });
-      setCurrentCaption(currentCaption ? currentCaption.text : '');     */
-
       const currentTime = audio.currentTime;
 
       // Find the current caption
@@ -382,7 +399,6 @@ export function ConsolePage() {
           setCurrentCaption(highlightedCaption); // Update the UI
         }
       }
-
     };   
 
     const handleLoadedMetadata = () => {
@@ -399,6 +415,15 @@ export function ConsolePage() {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
     };
   }, []);  
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);    
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
       setIsDragging(true);
@@ -429,7 +454,7 @@ export function ConsolePage() {
           audioRef.current.currentTime = (newProgress / 100) * audioRef.current.duration;
         }
       }
-    };
+  };
 
 /**
  * Converts a standard YouTube video URL to an embeddable URL.
@@ -453,14 +478,12 @@ function convertToEmbedUrl(url: string): string | null {
 
   //Display the Video Popup
   useEffect(() => {
-
     const closeButton = document.getElementById('closePopup');
     const popupOverlay = document.getElementById('videoPopup');
     const videoFrame = document.getElementById('videoFrame');  
     const searchBox = document.getElementById('searchBox');  
 
     if( closeButton && popupOverlay && videoFrame && searchBox) { 
-
     // Close the popup and stop the video
       closeButton.addEventListener('click', () => {
         (videoFrame as HTMLIFrameElement).src = '';
@@ -468,25 +491,13 @@ function convertToEmbedUrl(url: string): string | null {
 
         (searchBox as HTMLInputElement).value = ''; // Clear the search box
       });
-
     }    
 
     return () => {
-      //openButton.removeEventListener('mousemove', handleMouseMove);
       //closeButton.removeEventListener('mouseup', handleMouseUp);
-      //popupOverlay.removeEventListener('click', (event) => {
     };       
 
   }, []);      
-
-  useEffect(() => {
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging]);  
 
   // Keydown event handling
   useEffect(() => {
@@ -554,11 +565,9 @@ function convertToEmbedUrl(url: string): string | null {
         count = (count + 1) % (maxDots + 1); // Cycle between 0, 1, 2, 3
         (searchBox as HTMLInputElement).value = searchValue + ".".repeat(count);
     }, interval);       
-
   }
 
   const clearTimerforSearchBox = (info: string) => {
-
     const searchBox = document.getElementById('searchBox');
 
     if (animation) {
@@ -568,7 +577,6 @@ function convertToEmbedUrl(url: string): string | null {
         (searchBox as HTMLInputElement).value = info; // Clear the search box
       }
     }    
-    
   }
 
   const toggleAudio = async () => {
@@ -655,6 +663,7 @@ function convertToEmbedUrl(url: string): string | null {
           if (popupOverlay){
             popupOverlay.style.display = 'flex';
             clearTimerforSearchBox(query);
+            (searchBox as HTMLInputElement).style.color = 'blue'; // Reset the color
           }
         } else {
           //clearTimerforSearchBox('Failed to convert to embeddable URL.');
@@ -670,7 +679,6 @@ function convertToEmbedUrl(url: string): string | null {
       clearTimerforSearchBox('Error occurred during YouTube search');
       console.error('Error occurred during YouTube search:', error);
     });                         
-
   }
   
   /**
@@ -779,15 +787,6 @@ function convertToEmbedUrl(url: string): string | null {
     //setItems(client.conversation.getItems());
     setItems(items);
 
-    /*
-    // Connect to microphone
-    await wavRecorder.begin();
-
-    // Connect to audio output
-    // Enhanced with one parameter to resume playback when reply speek is finished
-    await wavStreamPlayer.connect(audioRef.current, videoRef.current, setIsPlaying);
-    wavStreamPlayer.askStop = true;
-    */
 
     try{
       setIsConnectionError(false);
@@ -806,73 +805,15 @@ function convertToEmbedUrl(url: string): string | null {
         client.realtime.apiKey = apiKey;
         await client.connect();
       } else {
-        //setIsMuted(!isMuted);
         setIsMuteBtnDisabled(false);        
       }
-      //await client.connect();
 
-      /*
-      // Connect to microphone
-      await wavRecorder.begin();
-
-      // Connect to audio output
-      // Enhanced with one parameter to resume playback when reply speek is finished
-      await wavStreamPlayer.connect(audioRef.current, videoRef.current, setIsPlaying);
-      wavStreamPlayer.askStop = true;      
-      */
-      /*
-      client.sendUserMessageContent([
-        {
-          type: `input_text`,
-          text: `Hello!`,
-          // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
-        },
-      ]);    */
-      
-      //setIsConnected(true);
-
-      //if (client.getTurnDetectionType() === 'server_vad' && client.isConnected()) {
-      //  await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-        // Test new feature - Capture audio from other apps 
-        /*
-        const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true });
-        const audioContext = new AudioContext({ sampleRate: 44100 });
-        const source = audioContext.createMediaStreamSource(stream);
-    
-        const processor = audioContext.createScriptProcessor(4096, 1, 1);
-        source.connect(processor);
-        processor.connect(audioContext.destination);
-    
-        processor.onaudioprocess = (audioEvent) => {
-            const float32Data = audioEvent.inputBuffer.getChannelData(0);
-            const pcm16Data = new Int16Array(float32Data.length);
-    
-            // Convert Float32 to PCM16
-            for (let i = 0; i < float32Data.length; i++) {
-                let s = Math.max(-1, Math.min(1, float32Data[i]));
-                pcm16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-            }
-            
-            client.appendInputAudio(pcm16Data);
-
-            // pcm16Data now contains the PCM16 audio data
-            console.log(pcm16Data);
-            // You can now send pcm16Data to a server, save to file, etc.
-        }; */         
-        // Test new feature - Capture audio from other apps
-        
-      //}
-
-      // mute recording by default when copilot is turned on
-      //await muteRecording();            
     } catch (error) {
       setIsMuted(true);
       setIsMuteBtnDisabled(false);
       setIsConnectionError(true);
-      //switchAudioCopilotOff();
       console.error('Error playing audio:', error);
     }
-
   }, []);
     
   /**
@@ -1488,14 +1429,6 @@ function convertToEmbedUrl(url: string): string | null {
       await wavStreamPlayer.connect(audioRef.current, videoRef.current, setIsPlaying);
       wavStreamPlayer.askStop = true;      
 
-      /*
-      client.sendUserMessageContent([
-        {
-          type: `input_text`,
-          text: `Hello!`,
-          // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
-        },
-      ]);    */
       setIsConnected(true);
     });      
     // hanks
@@ -1508,36 +1441,12 @@ function convertToEmbedUrl(url: string): string | null {
     };
   }, []);
 
-  interface FormatTimeProps {
-    time: number;
-  }
-
-  const formatDuration = ({ time }: FormatTimeProps): string => {
-    const hours = Math.floor(time / 3600);
-    const minutes = Math.floor((time % 3600) / 60);
-    const seconds = Math.floor(time % 60);
-    return hours > 0
-      ? `${hours}:${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`
-      : `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-  };
-
-  interface SpeedControlClickEvent extends React.MouseEvent<HTMLDivElement> {
-    stopPropagation: () => void;
-  }
-
-  const handleSpeedControlClick = (event: SpeedControlClickEvent, speed: number): void => {
-    event.stopPropagation(); // Prevent the event from bubbling up to the progress bar
-
-    setPlaybackRate(speed);
-    console.log(`Speed set to ${speed}`);
-  };
-
   /**
    * Render the application
    */
   return (
     <div data-component="ConsolePage">
-      {/* Original top is hidden */}
+      {/* Original content-top from openai-realtime-console  is hidden */}
       <div className="content-top">
         <div className="content-title">
           <img src="/resource/great_developer.jpg" />
@@ -1554,17 +1463,15 @@ function convertToEmbedUrl(url: string): string | null {
             />
           )}
         </div>
-      </div>
-
-      <button id="openPopup"  style={{display: 'none'}}>Play Video</button>
+      </div>      
+      {/* Popup Layer for display the video from youtube search  */}      
       <div id="videoPopup" className="popup-overlay">
         <div className="popup-content">
           <span id="closePopup" className="close-button">&times;</span>
           <iframe id="videoFrame" width="672" height="378" src="" allowFullScreen></iframe>
         </div>
       </div>
-
-      {/* Upper area to display PDF */}
+      {/* Area to display PDF Magzine */}
       <div>
         <object data={pdfFilePath} type="application/pdf" width="100%" height="672px">
           {<p>Your browser does not support PDFs. <a href={pdfFilePath}>Download the PDF</a>.</p> }
@@ -1578,7 +1485,7 @@ function convertToEmbedUrl(url: string): string | null {
               dangerouslySetInnerHTML={{ __html: currentCaption }}
               style={{ fontSize: '1.5em', marginTop: '20px' }}
           ></div> )
-        }           
+        } 
         <div className="content-caption">
           <Button
                 label={isCaptionVisible ? 'Hide Captions' : 'Show Captions'}
@@ -1589,14 +1496,20 @@ function convertToEmbedUrl(url: string): string | null {
         </div>
         {/* This hidden button is to receive space bar down event to play/pause the audio */}
         <button ref={playPauseBtnRef} onClick={toggleAudio} className='hidden-button'></button>
-        <Button
-                label={isPlaying ? 'Pause' : 'Play\u00A0'}
-                iconPosition={'start'}
-                icon={isPlaying ? Pause : Play}
-                buttonStyle={'regular'}
-                onClick={toggleAudio}
-                className='button'
-        />
+        <div className="mute-container">
+          <Button
+                  label={isPlaying ? 'Pause' : 'Play\u00A0'}
+                  iconPosition={'start'}
+                  icon={isPlaying ? Pause : Play}
+                  buttonStyle={'regular'}
+                  onClick={toggleAudio}
+                  className='button'
+          />
+          <div className="tooltip">
+            <span>Press Space(空格键) to <> {isPlaying ? 'Pause' : 'Play'} </> the on-going Audio</span><br />
+          </div>             
+        </div>
+        {/* Progress area */}
         <div 
           ref={progressBarRef}
           style={{position: 'relative', width: '60%', backgroundColor: '#ccc', height: '0.625em', borderRadius: '0.3125em', marginTop: '0.2em', marginLeft: '-1px' }}
@@ -1609,6 +1522,7 @@ function convertToEmbedUrl(url: string): string | null {
               borderRadius: '0.3125em'
             }}
           />
+          {/* Three Speed control Options at the left-down of progress area */}
           <div className="speed-controls" onMouseDown={(e) => {
                                                                 e.stopPropagation(); // Prevent event from reaching the progress bar
                                                               }}>
@@ -1626,8 +1540,19 @@ function convertToEmbedUrl(url: string): string | null {
               backgroundColor: playbackRate === 1.2 ? '#666' : '#ccc', // Darker if active
               color: playbackRate === 1.2 ? '#fff' : '#000', // Adjust text color for contrast
               borderRadius: '0.3125em',
-            }}    onClick={(e) => handleSpeedControlClick(e, 1.2)}>Faster</div>      
-            <div style={{position: 'fixed', transform:'translateX(150px)', bottom: '0px'}}><input className='dynamic-searchBox' type="text" id="searchBox" placeholder="Type and Press Enter to Search a Video" onFocus={() => { (document.getElementById('searchBox') as HTMLInputElement).value = ''; (document.getElementById('searchBox') as HTMLInputElement).style.color = 'blue'; }} /></div>  
+            }}    onClick={(e) => handleSpeedControlClick(e, 1.2)}>Faster</div>    
+            {/* Place the search box for video at the right-down of progress bar area */}  
+            <div style={{position: 'fixed', transform:'translateX(505px)', bottom: '1px'}}>
+              <input id="searchBox" 
+                     type="text"                      
+                     className='dynamic-searchBox' 
+                     placeholder="Type and Press Enter to Search a Video" 
+                     onFocus={() => { const searchBox = document.getElementById('searchBox');                                        
+                                      (searchBox as HTMLInputElement).value = ''; 
+                                      (searchBox as HTMLInputElement).style.color = 'blue'; 
+                                    }} 
+              /> {/*end of search box input*/}
+            </div>  
           </div>
           {/* Display the current play time */}
           <div
@@ -1659,7 +1584,7 @@ function convertToEmbedUrl(url: string): string | null {
               onClick={toggleMuteRecording}
             />
           <div className="tooltip">
-            <strong className='tooltip-title'>Turn on/off microphone</strong><br />
+            <strong className='tooltip-title'>Turn <>{isMuted ? 'on' : 'off'}</> microphone</strong><br />
             {!isConnected && <>The <span className="highlightred">first</span> turning on will start the Audio Copilot.<br /><br /> </>}
             {isConnected && <><br /> </>}
           </div>            
@@ -1678,7 +1603,7 @@ function convertToEmbedUrl(url: string): string | null {
           )}
         </div>        
       </div>   
-      {/* Original content is hidden */}
+      {/* Original content-main from openai-realtime-console is hidden */}
       <div className="content-main">
         <div className="content-logs">
           <div className={isHidden ? 'content-block conversation-display' : 'content-block conversation'}>

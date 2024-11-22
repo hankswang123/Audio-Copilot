@@ -173,7 +173,7 @@
 
   /* Make it more larger regarding height when the search box is focused */
   .dynamic-searchBox:focus {
-    height: 25px; /* Height when focused */
+    height: 24px; /* Height when focused */
   }  
 
   .content-top {
@@ -330,12 +330,6 @@
     }
   }
 
-  .mute-container {
-    position: relative;
-    display: inline-block;
-    z-index: 9999;
-  }
-
   /* Hide the popup by default */
   .popup-overlay {
     display: none;
@@ -406,6 +400,12 @@
     border-width: 6px; /* Size of the arrow */
     border-style: solid;
     border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent; /* Arrow color */
+  }  
+
+  .mute-container {
+    position: relative;
+    display: inline-block;
+    z-index: 9999;
   }  
 
   .mute-container:hover .tooltip {
