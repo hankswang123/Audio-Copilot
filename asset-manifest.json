@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/Audio-Copilot/static/css/main.99af2ee7.css",
-    "main.js": "/Audio-Copilot/static/js/main.1f41a374.js",
+    "main.css": "/Audio-Copilot/static/css/main.8faee6e2.css",
+    "main.js": "/Audio-Copilot/static/js/main.1cdf5b99.js",
     "static/js/453.104d52a0.chunk.js": "/Audio-Copilot/static/js/453.104d52a0.chunk.js",
     "index.html": "/Audio-Copilot/index.html",
-    "main.99af2ee7.css.map": "/Audio-Copilot/static/css/main.99af2ee7.css.map",
-    "main.1f41a374.js.map": "/Audio-Copilot/static/js/main.1f41a374.js.map",
+    "main.8faee6e2.css.map": "/Audio-Copilot/static/css/main.8faee6e2.css.map",
+    "main.1cdf5b99.js.map": "/Audio-Copilot/static/js/main.1cdf5b99.js.map",
     "453.104d52a0.chunk.js.map": "/Audio-Copilot/static/js/453.104d52a0.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.99af2ee7.css",
-    "static/js/main.1f41a374.js"
+    "static/css/main.8faee6e2.css",
+    "static/js/main.1cdf5b99.js"
   ]
 }
