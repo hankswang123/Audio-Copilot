@@ -11,7 +11,7 @@
 const LOCAL_RELAY_SERVER_URL: string =
   process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 
 import { RealtimeClient } from '@openai/realtime-api-beta';
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
@@ -19,16 +19,19 @@ import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
 import { instructions, additional_info } from '../utils/conversation_config.js';
 import { WavRenderer } from '../utils/wav_renderer';
 
-import { X, Edit, Zap, ArrowUp, ArrowDown, Play, Pause, Mic, MicOff } from 'react-feather';
+import { X, Edit, Zap, ArrowUp, ArrowDown, Play, Pause, Mic, MicOff, Plus, Minus } from 'react-feather';
 import { Button } from '../components/button/Button';
 import { Toggle } from '../components/toggle/Toggle';
+import Chat from '../components/chat/Chat';
 import { Map } from '../components/Map';
+
+import { Document, Page } from 'react-pdf';
 
 import './ConsolePage.scss';
 import { isJsxOpeningLikeElement } from 'typescript';
 import e from 'express';
 //import { audioCaptions } from '../utils/audio_captions.js';
-import { audioCaptions } from '../utils/scripts2captions.js';
+import { audioCaptions, keywords } from '../utils/scripts2captions.js';
 import { pdfFilePath, audioFilePath } from '../filePaths.js'; // Import the file paths
 
 //import nodemailer from 'nodemailer';
@@ -142,6 +145,7 @@ export function ConsolePage() {
   const [isMuted, setIsMuted] = useState(true);
   const [progress, setProgress] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1.0); // State to control playback speed
+  const [keyword, setKeyword] = useState(''); // State to store keyword
   const [isHidden, setIsHidden] = useState(true); // State to control audio/video visibility
   const [isDragging, setIsDragging] = useState(false);
   const [currentCaption, setCurrentCaption] = useState(''); // State to display current caption
@@ -150,12 +154,119 @@ export function ConsolePage() {
   const [isCaptionVisible, setIsCaptionVisible] = useState(false); // State to manage caption visibility
   const [isMuteBtnDisabled, setIsMuteBtnDisabled] = useState(false);
   const [isConnectionError, setIsConnectionError] = useState(false);
-  const [startingText, setStartingText] = useState('Copilot is turning on');
+  const [startingText, setStartingText] = useState('Turning on');
   const [dotCount, setDotCount] = useState(0);
   const progressBarRef = useRef(null);  
   const playPauseBtnRef = useRef<HTMLButtonElement>(null); // Add a ref for the play/pause button
   const audioRef = useRef<HTMLAudioElement | null>(null);  
   const videoRef = useRef<HTMLVideoElement | null>(null);  
+
+  const [numPages, setNumPages] = useState<number>();
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const containerRef = useRef(null); // Ref for the scrollable container
+  const pageRefs = useRef<React.RefObject<HTMLDivElement>[]>([]); // Array of refs for each page
+  const [scale, setScale] = useState(1); // Zoom level
+  const [renderedPages, setRenderedPages] = useState([1]); // Track pages rendered in the DOM
+
+  interface PageRefs {
+    current: Array<React.RefObject<HTMLDivElement>>;
+  }
+
+  interface GoToPageProps {
+    pageNumber: number;
+  }
+
+  const goToPage = ({ pageNumber }: GoToPageProps): void => {
+    if (pageRefs.current[pageNumber]){
+      // Scroll the specific page into view
+      pageRefs.current[pageNumber].current?.scrollIntoView({
+        behavior: 'auto', // Instantly jumps to the page
+        block: 'start', // Align the top of the page with the container
+      });
+    } else {
+      alert(`Page ${pageNumber} is out of range!`);
+    }
+  };
+
+  function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
+    setNumPages(numPages);
+
+    pageRefs.current = Array(numPages)
+      .fill(null)
+      .map((_, i) => pageRefs.current[i] || React.createRef());    
+  }
+
+  interface OnPageLoadSuccessProps {
+    pageNumber: number;
+  }
+
+  const onPageLoadSuccess = ({ pageNumber }: OnPageLoadSuccessProps): void => {
+    console.log(`Page ${pageNumber} loaded successfully.`);
+
+    // Add the next page to the DOM
+    setRenderedPages((prev) => {
+      const nextPage = Math.min(pageNumber + 1, numPages || 0);
+      return prev.includes(nextPage) ? prev : [...prev, nextPage];
+    });    
+  };
+
+  // Handle zooming
+  interface WheelZoomEvent extends React.WheelEvent<HTMLDivElement> {
+    ctrlKey: boolean;
+    deltaY: number;
+  }
+
+  const handleWheelZoom = (event: WheelEvent): void => {
+    
+    const buttonRow: HTMLDivElement | null = document.getElementById('button-row') as HTMLDivElement | null;
+    if (buttonRow) {
+      if(event.target === buttonRow) {return;}
+    }
+
+    if (event.ctrlKey) {
+      // Prevent default zoom behavior
+      if (event.target !== containerRef.current) {return;}
+      event.preventDefault();
+      event.stopPropagation();
+
+      //const zoomSpeed = 0.05; // Adjust sensitivity
+      // Adjust zoom level
+      const newScale = scale + (event.deltaY < 0 ? 0.1 : -0.1);
+      setScale(Math.max(newScale, 0.5)); // Minimum zoom level of 0.5
+
+      if (buttonRow) {
+        buttonRow.style.transform = `scale(${1 / newScale})`;
+      }
+    }
+  };
+
+  // Add the zoom handler with `capture` mode
+  useEffect(() => {
+    const container = containerRef.current as HTMLDivElement | null;
+
+    if (container !== null) {
+      if (container) {
+        container.addEventListener('wheel', handleWheelZoom, { capture: true });
+      }
+    }
+
+      // Prevent wheel events from affecting the window when inside the container
+      const preventWindowZoom = (event: WheelEvent) => {
+        if (event.ctrlKey && event.target === container) {
+          event.preventDefault();
+        }
+      };
+      window.addEventListener('wheel', preventWindowZoom, { passive: false });    
+
+    // Cleanup the event listener on unmount
+    return () => {
+      if (container) {
+        container.removeEventListener('wheel', handleWheelZoom, { capture: true });
+        window.removeEventListener('wheel', preventWindowZoom);
+      }
+    };
+  }, [scale]);  
+
   /*
   const playerRef = useRef(null); // Ref to hold the YT.Player instance
   useEffect(() => {
@@ -232,7 +343,7 @@ export function ConsolePage() {
 
   useEffect(() => {
     if (isMuteBtnDisabled) {
-      setStartingText(`Copilot is turning on${'.'.repeat(dotCount)}`);
+      setStartingText(`Turning on${'.'.repeat(dotCount)}`);
     }
   }, [dotCount, isMuteBtnDisabled]);  
 
@@ -303,6 +414,19 @@ export function ConsolePage() {
     setIsCaptionVisible(!isCaptionVisible);
   };     
 
+  const adjustCaptionFontSize = (adjustment: number) => { 
+    const captionDisplay = document.getElementById('captionDisplay');
+    if (captionDisplay && captionDisplay.parentElement) {
+
+      const currentFontSize = window.getComputedStyle(captionDisplay).fontSize;
+      const parentFontSize = window.getComputedStyle(captionDisplay.parentElement).fontSize;
+      const baseFontSize = parseFloat(parentFontSize); // Get the base font size of the parent element
+      const currentFontSizeInEm = parseFloat(currentFontSize) / baseFontSize; // Convert px to em based on parent font size
+      const newFontSizeInEm = (currentFontSizeInEm + adjustment) > 3 ? 3 : ((currentFontSizeInEm + adjustment) < 1 ? 1 : (currentFontSizeInEm + adjustment)) ; // Adjust the font size
+      captionDisplay.style.fontSize = `${newFontSizeInEm}em`;                  
+    }      
+  }
+
   interface FormatTimeProps {
     time: number;
   }
@@ -326,6 +450,32 @@ export function ConsolePage() {
     setPlaybackRate(speed);
     console.log(`Speed set to ${speed}`);
   };  
+    
+  const handleKeywordClick = (event: SpeedControlClickEvent, keyword: string, currentTime: number, page: number): void => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the progress bar
+
+    setKeyword(keyword);
+    if (audioRef.current) {
+      audioRef.current.currentTime = currentTime;
+
+      goToPage({ pageNumber: page });
+      const pdfViewer = document.getElementById("pdfFile");
+      if (pdfViewer) {
+        (pdfViewer as HTMLObjectElement).data = pdfFilePath + `?t=` + (new Date()).getTime() + `#page=` + page;//&t=${new Date().getTime()}
+        console.log((pdfViewer as HTMLObjectElement).data);
+      }
+    }
+/*
+    if (audioRef.current) {
+      if(index === 1)
+      {
+        audioRef.current.currentTime = 26;
+      }else if(index === 2)
+      {
+        audioRef.current.currentTime = 96;
+      }
+    }*/
+  };    
 
   //Update the progress bar and current time when the audio is playing
   useEffect(() => {
@@ -645,7 +795,17 @@ function convertToEmbedUrl(url: string): string | null {
     const searchBox = document.getElementById('searchBox');
     const popupOverlay = document.getElementById('videoPopup');
     const videoFrame = document.getElementById('videoFrame');
+    const popupContent = document.getElementById('popupContent');
+    const chatBot = document.getElementById('chatBot');
 
+    /*(videoFrame as HTMLIFrameElement).src = embedUrl;
+    if (popupOverlay){
+      popupOverlay.style.display = 'flex';
+      clearTimerforSearchBox(query);
+      (searchBox as HTMLInputElement).style.color = 'blue'; // Reset the color
+    }  */  
+
+    
     performYoutubeSearch(query)
     .then((results) => {
       if (results.length > 0) {
@@ -660,6 +820,9 @@ function convertToEmbedUrl(url: string): string | null {
         if (embedUrl) {
           console.log(`Embeddable URL: ${embedUrl}`);
           (videoFrame as HTMLIFrameElement).src = embedUrl;
+          (videoFrame as HTMLIFrameElement).style.display = 'flex';
+          (chatBot as HTMLIFrameElement).style.display = 'none';
+          (popupContent as HTMLIFrameElement).className = 'popup-content-video';
           if (popupOverlay){
             popupOverlay.style.display = 'flex';
             clearTimerforSearchBox(query);
@@ -678,7 +841,7 @@ function convertToEmbedUrl(url: string): string | null {
     .catch((error) => {
       clearTimerforSearchBox('Error occurred during YouTube search');
       console.error('Error occurred during YouTube search:', error);
-    });                         
+    });                    
   }
   
   /**
@@ -709,6 +872,20 @@ function convertToEmbedUrl(url: string): string | null {
       ];
     }
   }    
+
+  const openChatbot = () => {
+    const chatBot = document.getElementById('chatBot');
+    const popupOverlay = document.getElementById('videoPopup');
+    const videoFrame = document.getElementById('videoFrame');
+    const popupContent = document.getElementById('popupContent');
+
+    if (popupOverlay){
+      popupOverlay.style.display = 'flex';
+      (videoFrame as HTMLIFrameElement).style.display = 'none';
+      (chatBot as HTMLIFrameElement).style.display = 'flex'; 
+      (popupContent as HTMLIFrameElement).className = 'popup-content-chat';       
+    }    
+  }
 
   const toggleMuteRecording = async () => {
     if (wavRecorderRef.current && clientRef.current) {
@@ -1468,37 +1645,123 @@ function convertToEmbedUrl(url: string): string | null {
       </div>      
       {/* Popup Layer for display the video from youtube search  */}      
       <div id="videoPopup" className="popup-overlay">
-        <div className="popup-content">
+        <div id="popupContent" className="popup-content-chat">
           <span id="closePopup" className="close-button">&times;</span>
-          <iframe id="videoFrame" width="672" height="378" src="" allowFullScreen></iframe>
+          <iframe id="videoFrame" width="1000" height="562.5" src="" allow="fullscreen" allowFullScreen style={{display: 'none'}}></iframe>
+          <iframe id="chatBot" width="100%" height="100%" src="http://localhost:4000/examples/audio-copilot" allow="fullscreen" allowFullScreen style={{display: 'none'}}></iframe>
         </div>
       </div>
       {/* Area to display PDF Magzine */}
+      {/* object to display PDF file 
       <div>
-        <object data={pdfFilePath} type="application/pdf" width="100%" height="672px">
+        <object id="pdfFile" data={pdfFilePath} type="application/pdf" width="100%" height="672px">
           {<p>Your browser does not support PDFs. <a href={pdfFilePath}>Download the PDF</a>.</p> }
         </object>        
-      </div>
+      </div>  */}
+      {/* Use PDF-REACT to display the PDF file: https://github.com/wojtekmaj/react-pdf    
+
+      <div ref={containerRef}  // Attach zoom handler to this container only
+          style={{       
+            margin: '0 auto',       // Center horizontally
+            width: '100%',           // Adjust the width as needed
+            overflowY: 'auto',      // Enable scrolling
+            height: '100vh',        // Full height of the viewport
+            backgroundColor: '#f4f4f4', // Optional: background color
+      }}>
+        <Document file={pdfFilePath} onLoadSuccess={onDocumentLoadSuccess}>
+
+          {Array.from(new Array(numPages), (el, index) => (
+                <div
+                  ref={pageRefs.current[index]}
+                  key={`page_${index + 1}`}
+                  style={{
+                    marginBottom: '10px',
+                    flexShrink: 0, // Prevent shrinking
+                    margin: '20px auto', // Center the page horizontally
+                    width: 'fit-content', // Shrink wrapper to fit content width                    
+                  }}
+                >
+                  <Page pageNumber={index + 1} 
+                        renderTextLayer={false} 
+                        renderAnnotationLayer={false} 
+                        onLoadSuccess={() => onPageLoadSuccess({ pageNumber: index + 1 })}
+                        scale={scale}   />
+                </div>
+          ))}
+        </Document>
+      </div> */}
+
+      <div ref={containerRef}  // Attach zoom handler to this container only
+                style={{       
+                  margin: '0 auto',       // Center horizontally
+                  width: '100%',           // Adjust the width as needed
+                  overflowY: 'auto',      // Enable scrolling
+                  height: '100vh',        // Full height of the viewport
+                  backgroundColor: '#f4f4f4', // Optional: background color
+            }}>
+        <Document file={pdfFilePath} onLoadSuccess={onDocumentLoadSuccess}>
+
+          {renderedPages.map((pageNumber) => (
+                <div
+                ref={pageRefs.current[pageNumber]}
+                key={`page_${pageNumber + 1}`}
+                style={{
+                  marginBottom: '10px',
+                  flexShrink: 0, // Prevent shrinking
+                  margin: '20px auto', // Center the page horizontally
+                  width: 'fit-content', // Shrink wrapper to fit content width                    
+                }}
+              >            
+            <Page
+              key={`page_${pageNumber}`}
+              pageNumber={pageNumber}
+              renderTextLayer={false} 
+              renderAnnotationLayer={false}               
+              onLoadSuccess={() => onPageLoadSuccess({ pageNumber })} // Incrementally add pages
+              loading={<p>Loading page {pageNumber}...</p>} // Page loading indicator
+            />
+            </div>
+          ))}
+
+        </Document>
+      </div> 
+
       {/* Bellow toolbar area to display different buttons, captions, progress bar, mute/unmute button */}
-      <div className='button-row'>
+      <div id='button-row' className='button-row'>
+        {/* Adjust the caption font size if it is visible */}
+        {isCaptionVisible && ( 
+          <div>
+            <div className="captionFont" style={{cursor:'pointer'}} onClick={() => {adjustCaptionFontSize(+0.1)}}>+</div>
+            <div className="captionFont" style={{cursor:'pointer'}} onClick={() => {adjustCaptionFontSize(-0.1)}}>-</div>            
+          </div> )
+        }         
         {/* Add a div to display the current caption */}
         {isCaptionVisible && ( 
-          <div className="caption-display"
+          <div id='captionDisplay' className="caption-display"
               dangerouslySetInnerHTML={{ __html: currentCaption }}
-              style={{ fontSize: '1.5em', marginTop: '20px' }}
+              style={{ fontSize: '2em', marginTop: '20px' }}
           ></div> )
         } 
         <div className="content-caption">
-          <Button
-                label={isCaptionVisible ? 'Hide Captions' : 'Show Captions'}
-                buttonStyle={'regular'}
-                onClick={toggleCaptionVisibility}
-                className='button'
-              />  
+          <div className="tooltip-container">
+            <Button
+                  label={isCaptionVisible ? 'Hide Captions' : 'Show Captions'}
+                  buttonStyle={'regular'}
+                  onClick={toggleCaptionVisibility}
+                  className='button'
+                />  
+            {isCaptionVisible && ( 
+              <div className="tooltip">
+                <span>-</span>
+                <span>  </span>
+                <span>+</span>                                 
+              </div>   )
+            }                                
+          </div>
         </div>
         {/* This hidden button is to receive space bar down event to play/pause the audio */}
         <button ref={playPauseBtnRef} onClick={toggleAudio} className='hidden-button'></button>
-        <div className="mute-container">
+        <div className="tooltip-container">
           <Button
                   label={isPlaying ? 'Pause' : 'Play\u00A0'}
                   iconPosition={'start'}
@@ -1542,13 +1805,31 @@ function convertToEmbedUrl(url: string): string | null {
               backgroundColor: playbackRate === 1.2 ? '#666' : '#ccc', // Darker if active
               color: playbackRate === 1.2 ? '#fff' : '#000', // Adjust text color for contrast
               borderRadius: '0.3125em',
-            }}    onClick={(e) => handleSpeedControlClick(e, 1.2)}>Faster</div>    
+            }}    onClick={(e) => handleSpeedControlClick(e, 1.2)}>Faster</div>  
+            <div></div>
+            <div>Keywords:</div>
+            {Object.entries(keywords).map(([key, [value1, value2]], index) => (
+              <div
+                key={index} // Use index as the key for React
+                className="keyword"
+                style={{
+                  backgroundColor: keyword === key ? '#666' : '#ccc', // Darker if active
+                  color: keyword === key ? '#fff' : '#000', // Adjust text color for contrast
+                  borderRadius: '0.3125em',
+                  whiteSpace: 'nowrap',
+                }}
+                onClick={(e) => handleKeywordClick(e, key, value1, value2)} // Pass value to the click handler
+              >
+                {key} {/* Display the key */}
+              </div>
+            ))}                         
             {/* Place the search box for video at the right-down of progress bar area */}  
-            <div style={{position: 'fixed', transform:'translateX(505px)', bottom: '1px'}}>
+            <div style={{position: 'fixed', transform:'translateX(41.5em)', bottom: '1px'}}>
               <input id="searchBox" 
                      type="text"                      
                      className='dynamic-searchBox' 
                      placeholder="Type and Press Enter to Search a Video" 
+                     style={{display:"none"}}
                      onFocus={() => { const searchBox = document.getElementById('searchBox');                                        
                                       (searchBox as HTMLInputElement).value = ''; 
                                       (searchBox as HTMLInputElement).style.color = 'blue'; 
@@ -1575,8 +1856,18 @@ function convertToEmbedUrl(url: string): string | null {
           <div className="audio-duration">
             {formatDuration({time: totalDuration})}
           </div>          
-        </div>    
-        <div className="mute-container">
+        </div>   
+        <div className="tooltip-container">
+          <Button
+                label={'AI'}
+                buttonStyle={'regular'}
+                onClick={openChatbot}
+              /> 
+          <div className="tooltip">
+            <span>Open Chatbot to: Ask for question or Search a Video from youtube or Search in the Magzine</span><br />
+          </div>             
+        </div>              
+        <div className="tooltip-container">
           <Button
               label={isMuted ? '' : ''}
               iconPosition={'start'}
@@ -1591,7 +1882,7 @@ function convertToEmbedUrl(url: string): string | null {
             {isConnected && <><br /> </>}
           </div>            
         </div>         
-        <div style={{ fontSize: '1em' }}>{isConnected ? ( <> Copilot is <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Connection error</span> occurred</> ) : ( <> Copilot is <span className="highlightred">Off</span> </> )) )}</div>
+        <div style={{ fontSize: '1em' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Connection error</span> occurred</> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div>
         <div className="content-api-key-1">
           {!LOCAL_RELAY_SERVER_URL && (
             <Button
@@ -1680,13 +1971,7 @@ function convertToEmbedUrl(url: string): string | null {
                 );
               })}
             </div>
-          </div>
-          <div className={isHidden ? 'video' : 'video-display'}>     
-            <video ref={videoRef} width="600px" controls>
-                <source src="./video/ck_interview.mp4" type="video/mp4" />
-                Your browser does not support the video tag.
-            </video> 
-          </div>                       
+          </div>                   
           <div className="content-actions">
           <Button
               label={isHidden ? 'A/V' : 'V/A'}

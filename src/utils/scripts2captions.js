@@ -35,5 +35,19 @@ function transformAudioScripts(script) {
 
 // Transform the audioScripts to desired audioCaptions format
 export const audioCaptions = transformAudioScripts(audioScripts);
+/*
+export const keywords = [
+    {"Zebra": 26},
+    {"Snow Bird": 96},
+];*/
+
+export const keywords = {
+    "Zebra": [26, 2],
+    "Markhor": [58, 4],
+    "Snow Bird": [96, 6],
+    "Snowshoe Hare": [128, 12],
+    "Walrus": [166, 18],
+    "Venus": [220, 20],
+  };
 
 console.log(audioCaptions);
