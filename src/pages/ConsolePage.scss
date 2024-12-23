@@ -8,7 +8,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  margin: 0px 8px;
+  //margin: 0px 8px;
+  margin-left: 0px;
+  margin-right: 0px;
   & > div {
     flex-shrink: 0;
   }
@@ -25,7 +27,7 @@
     bottom: 48px;
     width: 100%;
     text-align: left;
-    font-size: 3em;
+    font-size: 4em;
     background-color: rgba(0, 0, 0, 0.311);
     z-index: 2000;
     color: white;
@@ -88,10 +90,82 @@
     top: -3em; /* Adjust this value to move the input box higher */
   }  
 
-  .button-row {
+  .top-hover-area {
     display: flex;
-    //flex-wrap: wrap;
-    //justify-content: space-between;    
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 50px; /* Adjust the height as needed */
+    z-index: 999; /* Ensure it is above other elements */
+    //pointer-events: none; /* Prevent the area from intercepting mouse events */
+
+    &:not(:hover) .button-row-top {
+      display: none;
+      //opacity: 0.2; 
+    }    
+
+    .button-row-top {
+      display: flex; 
+      //display: none; 
+      flex-grow: 1;
+      margin-left: 0px; /* Adjust this value as needed */
+      //gap: 16px; /* Space between buttons */
+      gap: 0.1em; /* Space between buttons */
+      align-items: center; /* Align items vertically in the center */    
+      position: fixed;
+      //position: absolute;
+      top: 0; /* Adjust this value to position the button row at the top */
+      width: 100%; /* Make it span the full width of the viewport */
+      max-width: 100%;
+      box-sizing: border-box;
+      overflow: hidden; 
+      background-color: white; /* Optional: Set a background color to make it stand out */
+      z-index: 1000; /* Ensure it appears above other content */
+      //padding: 3px; /* Optional: Add some padding */
+      padding: 0.4em; /* Optional: Add some padding */
+      //padding-left: 0px; /* Ensure no padding on the left */
+      //box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
+      //box-shadow: 0 -0.125em 0.3125em rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Adjust the values as needed */
+      border-radius: 16px;
+      //margin: 1px;
+      opacity: 1;      
+    }       
+  }  
+/*
+  .top-hover-area:hover + .button-row-top {
+    display: flex; 
+  }
+
+  .top-hover-area:hover {
+    .button-row-top {
+      display: flex;
+    }    
+  }*/
+  
+
+
+  .content-api-key {
+    //visibility: hidden;
+    //visibility:visible;
+    display: flex;
+    justify-content: flex-end;      
+    margin-left: auto;
+    margin-right: 6px;
+  }    
+
+  .right-buttons {
+    //visibility: hidden;
+    //visibility:visible;
+    display: flex;
+    justify-content: flex-end;      
+    margin-left: auto;
+    margin-right: 0px;
+  }   
+
+  .button-row {
+    display: flex;  
     flex-grow: 1;
     //gap: 16px; /* Space between buttons */
     gap: 0.1em; /* Space between buttons */
@@ -100,12 +174,18 @@
     //position: absolute;
     bottom: 0; /* Adjust this value to position the button row at the bottom */
     width: 100%; /* Make it span the full width of the viewport */
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;     
     background-color: white; /* Optional: Set a background color to make it stand out */
-    z-index: 1000; /* Ensure it appears above other content */
+    z-index: 9999; /* Ensure it appears above other content */
     //padding: 3px; /* Optional: Add some padding */
     padding: 0.5em; /* Optional: Add some padding */
     //box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
     box-shadow: 0 -0.125em 0.3125em rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
+    border-radius: 16px;
+    margin: 1px;
+    opacity: 1;
   } 
 
   .button-row .button {
@@ -135,19 +215,50 @@
     padding-left: 0 !important; /* Ensure no padding on the left */
   }     
 
-  .content-api-key-1 {
-    //visibility: hidden;
-    //visibility:visible;
+  .floating-button {
+    position: fixed;
+    bottom: 50px; /* Adjust as needed */
+    right: 0px; /* Adjust as needed */
+    //background-color: #007bff; /* Button background color */
+    color: white; /* Button text color */
+    border: none;
     display: flex;
-    justify-content: flex-end;      
-    margin-left: auto;
-  }   
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 9997; /* Ensure it is above other elements */
+  }  
+
+  .floating-right-arrow {
+    position: fixed;
+    bottom: 400px; /* Adjust as needed */
+    right: 0px; /* Adjust as needed */
+    //background-color: #007bff; /* Button background color */
+    color: white; /* Button text color */
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 9999; /* Ensure it is above other elements */
+  }    
+
+  .splitter {
+    width: 4px;
+    background-color: lightgray;
+    cursor: col-resize;
+  }  
+
+  .splitter:hover {
+    //background-color: gray;
+    background-color: #696969;
+  }
 
   .speed-controls {
     display: flex;
     justify-content: flex-start;
     gap: 0.5em; /* Adjust as needed */
-    width: 20%;
+    width: 40%;
     margin-top: 0.2em; /* Adjust as needed */
   }
   
@@ -159,6 +270,34 @@
     cursor: pointer;
     text-align: center;
   }
+
+  .captionFont {
+    font-size: 0.8em; /* Adjust as needed */
+    padding: 0.2em 0.5em; /* Adjust as needed */
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .keyword {
+    font-size: 0.8em; /* Adjust as needed */
+    padding: 0.2em 0.5em; /* Adjust as needed */
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    cursor: pointer;
+    bottom: 0px;
+    z-index: 9900; 
+    text-align: center;
+    transition: font-size 0.3s ease, transform 0.3s ease;
+    transform-origin: bottom; /* Ensure scaling happens from the bottom */
+  }  
+
+  /* Make it more larger regarding height when the search box is focused */
+  .keyword:hover {
+    font-size: 1.2em;
+    transform: scaleY(1.2); /* Scale the height upwards */
+  }    
 
   /* Base style for the search box */
   .dynamic-searchBox {
@@ -177,8 +316,8 @@
   }  
 
   .content-top {
-    //display: flex;
-    display: none;
+    display: flex;
+    //display: none;
     align-items: center;
     padding: 8px 16px;
     min-height: 40px;
@@ -195,20 +334,17 @@
         height: 30px;
       }
     }
-    .content-api-key {
-      //visibility: hidden;
-      //visibility:visible;
-      display: flex;
-      justify-content: flex-end;      
-    }    
   }
 
   .content-main {
     flex-grow: 1;
     flex-shrink: 1 !important;
     margin: 0px 16px;
-    //display: flex;
-    display: none; //hide the orginal content
+    margin-left: 0px;
+    margin-right: 0px;
+    padding-left: 0px;
+    display: flex;
+    //display: none; //hide the orginal content
     overflow: hidden;
     margin-bottom: 24px;
     .content-block {
@@ -237,12 +373,21 @@
         }
       }
     }
+
     .content-right {
-      width: 400px;
-      flex-shrink: 0;
       display: flex;
+      //overflow-y: auto;
+      width: 400px;
+      //width: 100%;
+      flex-shrink: 0;
       flex-direction: column;
-      margin-left: 24px;
+      //margin-top: 50px;
+      //margin-left: 24px;
+      margin-left: 0px;
+      margin-right: 0px;
+      margin-bottom: 35px;
+      bottom: 0px;
+      flex-grow: 1;
       gap: 24px;
       & > div {
         border-radius: 16px;
@@ -256,8 +401,11 @@
           align-items: center;
           justify-content: center;
           line-height: 2em;
-          top: 16px;
-          left: 16px;
+          //margin-top: 50px;
+          //top: 16px;
+          //left: 16px;
+          top: -20px;
+          left: 0;
           padding: 4px 16px;
           background-color: #fff;
           border-radius: 1000px;
@@ -307,14 +455,15 @@
         border-top: 1px solid #e7e7e7;
       }
       .conversation {
-        //display: flex;
-        display: none;
+        display: flex;
+        //display: none;
         flex-shrink: 0;
         width: 100%;
         overflow: hidden;
         height: 400px;
         min-height: 0;
-        max-height: 400px;
+        //max-height: 400px;
+        max-height: 100%;
         border-top: 1px solid #e7e7e7;
       }
       .conversation-display {
@@ -339,31 +488,132 @@
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.8);
-    z-index: 900;
+    z-index: 9998;
     justify-content: center;
     align-items: center;
   }
 
   /* Popup content styling */
-  .popup-content {
+  .popup-content-conversation {
     position: relative;
     background-color: #fff;
     padding: 0px;
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    //new added
+    width: 60%;
+    height: 80%;    
+  }  
+
+  /* Popup content styling */
+  .popup-content-chat {
+    position: relative;
+    background-color: #fff;
+    padding: 0px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    //new added
+    width: 80%;
+    height: 90%;    
   }
 
-  /* Close button styling */
-  .close-button {
-    position: absolute; /* Positions the button relative to the modal */
-    top: 10px;          /* Adjusts the distance from the top edge */
-    right: 10px;        /* Adjusts the distance from the right edge */
-    font-size: 24px;    /* Sets the size of the close icon */
-    cursor: pointer;    /* Changes cursor to pointer on hover */
-    background: none;   /* Removes default button styling */
-    border: none;       /* Removes default button border */
-    color: red;        /* Sets the color of the close icon */
+  /* Popup content styling */
+  .popup-content-video {
+    position: relative;
+    background-color: #fff;
+    padding: 0px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);  
   }  
+
+  /* Close button styling */
+    .close-button {
+      position: absolute;
+      top: 0px;
+      right: 0px;
+      background: #aaa;
+      color: #fff;
+      display: flex;
+      border-radius: 16px;
+      padding: 2px;
+      cursor: pointer;
+      &:hover {
+        background: #696969;
+      }
+      svg {
+        stroke-width: 3;
+        width: 12px;
+        height: 12px;
+      }
+    }  
+
+  .close-button-right {
+    position: absolute;
+    z-index: 9999;
+    margin-top: 50px;
+    top: 0px;
+    right: 10px;
+    background: #aaa;
+    color: #fff;
+    display: flex;
+    border-radius: 16px;
+    padding: 2px;
+    cursor: pointer;
+    &:hover {
+      background: #696969;
+    }
+    svg {
+      stroke-width: 3;
+      width: 12px;
+      height: 12px;
+    }
+  }  
+
+  .close-icon-right {
+    position: absolute;
+    z-index: 9999;
+    margin-top: 50px;
+    top: 40%;;
+    right: 10px;
+    //background: #aaa;
+    background: lightgray;
+    color: #fff;
+    display: flex;
+    border-radius: 16px;
+    padding: 2px;
+    cursor: pointer;
+    &:hover {
+      background: #696969;
+    }
+    svg {
+      stroke-width: 3;
+      width: 12px;
+      height: 12px;
+    }
+  }    
+
+  .close-icon-left {
+    position: absolute;
+    z-index: 9990;
+    margin-top: 50px;
+    top: 40%;;
+    right: 400px;
+    //background: #aaa;
+    background: lightgray;
+    color: #fff;
+    display: flex;
+    border-radius: 16px;
+    padding: 2px;
+    cursor: pointer;
+    &:hover {
+      background: #696969;
+    }
+    svg {
+      stroke-width: 3;
+      width: 12px;
+      height: 12px;
+    }
+  }    
 
   .tooltip {
     visibility: hidden;
@@ -383,7 +633,8 @@
     opacity: 0;
     transition: opacity 0.3s;
     width: 250px;
-    z-index: 5001;
+    //z-index: 5001;
+    z-index: 9999;
   }  
 
   .tooltip-title {
@@ -402,16 +653,20 @@
     border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent; /* Arrow color */
   }  
 
-  .mute-container {
+  .tooltip-container {
     position: relative;
     display: inline-block;
     z-index: 9999;
   }  
 
-  .mute-container:hover .tooltip {
+  .tooltip-container:hover .tooltip {
     visibility: visible;
     opacity: 1;
   }  
+
+  .tooltip-container:hover .close-icon-right {
+    background: #696969;
+  }   
 
   .video {
         display: none;

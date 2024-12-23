@@ -18,6 +18,7 @@ const audioDir = path.join(__dirname, 'public', 'currentPlay');
 const pdfDir = path.join(__dirname, 'public', 'currentPlay');
 const filePath = path.join(__dirname, 'src', 'filePaths.js');
 
+/*
 const findFile = (dir, extensions) => {
   const files = fs.readdirSync(dir);
   return files.find(file => extensions.some(ext => file.endsWith(ext)));
@@ -25,6 +26,22 @@ const findFile = (dir, extensions) => {
 
 const audioFile = findFile(audioDir, ['.wav', '.mp3']);
 const pdfFile = findFile(pdfDir, ['.pdf']);
+*/
+
+const findLatestFile = (dir, extensions) => {
+  const files = fs.readdirSync(dir)
+    .filter(file => extensions.some(ext => file.endsWith(ext)))
+    .map(file => ({
+      file,
+      time: fs.statSync(path.join(dir, file)).mtime.getTime()
+    }))
+    .sort((a, b) => b.time - a.time);
+
+  return files.length > 0 ? files[0].file : null;
+};
+
+const audioFile = findLatestFile(audioDir, ['.wav', '.mp3']);
+const pdfFile = findLatestFile(pdfDir, ['.pdf']);
 
 const fileContent = `
 export const pdfFilePath = '${pdfFile ? `./currentPlay/${pdfFile}` : ''}';
