@@ -42,12 +42,20 @@ export const keywords = [
 ];*/
 
 export const keywords = {
-    "Zebra": [26, 2],
-    "Markhor": [58, 4],
-    "Snow Bird": [96, 6],
-    "Snowshoe Hare": [128, 12],
-    "Walrus": [166, 18],
-    "Venus": [220, 20],
+    "Zebra": [26, 56, 2],
+    "Markhor": [58, 90, 4],
+    "Snow Bird": [93, 127, 6],
+    "Snowshoe Hare": [128, 164, 12],
+    "Walrus": [166, 218, 18],
+    "Venus": [220, 247, 20],
+    "Mandrill": [252, 306, 24],
   };
 
 console.log(audioCaptions);
+
+/*
+Note that in client-side environments like web browsers, we recommend
+using WebRTC instead. It is possible, however, to use the standard 
+WebSocket interface in browser-like environments like Deno and 
+Cloudflare Workers.
+*/

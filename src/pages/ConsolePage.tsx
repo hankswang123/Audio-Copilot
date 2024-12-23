@@ -19,38 +19,19 @@ import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
 import { instructions, additional_info } from '../utils/conversation_config.js';
 import { WavRenderer } from '../utils/wav_renderer';
 
-import { X, Edit, Zap, ArrowUp, ArrowDown, Play, Pause, Mic, MicOff, Plus, Minus } from 'react-feather';
+import { X, Zap, Edit, Play, Pause, Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight } from 'react-feather';
 import { Button } from '../components/button/Button';
-import { Toggle } from '../components/toggle/Toggle';
-import Chat from '../components/chat/Chat';
-import { Map } from '../components/Map';
 
 import { Document, Page } from 'react-pdf';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 import './ConsolePage.scss';
-import { isJsxOpeningLikeElement } from 'typescript';
-import e from 'express';
-//import { audioCaptions } from '../utils/audio_captions.js';
 import { audioCaptions, keywords } from '../utils/scripts2captions.js';
 import { pdfFilePath, audioFilePath } from '../filePaths.js'; // Import the file paths
-
+import Chat, {openai} from '../components/chat/Chat';
+import PdfViewerWithIcons from '../components/pdf/PdfViewerWithIcons';
 //import nodemailer from 'nodemailer';
-/**
- * Type for result from get_weather() function call
- */
-interface Coordinates {
-  lat: number;
-  lng: number;
-  location?: string;
-  temperature?: {
-    value: number;
-    units: string;
-  };
-  wind_speed?: {
-    value: number;
-    units: string;
-  };
-}
 
 /**
  * Type for all event logs
@@ -77,7 +58,8 @@ export function ConsolePage() {
     localStorage.setItem('tmp::voice_api_key', apiKey);
   }*/
 
-    let animation: NodeJS.Timeout;    
+  //Timer of SearchBox animation effect for Youtube Video
+  let animation: NodeJS.Timeout;    
 
   //Comment out orinial API Key Prompt and 
   //Postpone the Prompt to first unmute click(will enable audio copilot)
@@ -119,26 +101,21 @@ export function ConsolePage() {
   const startTimeRef = useRef<string>(new Date().toISOString());
 
   /**
+   * References for
+   * - Chat component which will be used to display voice conversations
+   */
+  const chatRef = useRef(null);  
+
+  /**
    * All of our variables for displaying application state
    * - items are all conversation items (dialog)
-   * - realtimeEvents are event logs, which can be expanded
    * - memoryKv is for set_memory() function
    * - coords, marker are for get_weather() function
    */
   const [items, setItems] = useState<ItemType[]>([]);
   const [realtimeEvents, setRealtimeEvents] = useState<RealtimeEvent[]>([]);
-  const [expandedEvents, setExpandedEvents] = useState<{
-    [key: string]: boolean;
-  }>({});
   const [isConnected, setIsConnected] = useState(false);
-  const [canPushToTalk, setCanPushToTalk] = useState(true);
-  const [isRecording, setIsRecording] = useState(false);
   const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
-  const [coords, setCoords] = useState<Coordinates | null>({
-    lat: 37.775593,
-    lng: -122.418137,
-  });
-  const [marker, setMarker] = useState<Coordinates | null>(null);
 
   //hanks - Implementation of audio copilot
   const [isPlaying, setIsPlaying] = useState(false);
@@ -148,25 +125,49 @@ export function ConsolePage() {
   const [keyword, setKeyword] = useState(''); // State to store keyword
   const [isHidden, setIsHidden] = useState(true); // State to control audio/video visibility
   const [isDragging, setIsDragging] = useState(false);
+  const [isProgressDragging, setIsProgressDragging] = useState(false);
+  const [isSplitterDragging, setIsSplitterDragging] = useState(false);
   const [currentCaption, setCurrentCaption] = useState(''); // State to display current caption
   const [totalDuration, setTotalDuration] = useState(0); // State to store total duration
   const [currentTime, setCurrentTime] = useState(0); // State to store current play time
   const [isCaptionVisible, setIsCaptionVisible] = useState(false); // State to manage caption visibility
   const [isMuteBtnDisabled, setIsMuteBtnDisabled] = useState(false);
+  const [isCloseRightPanelDisabled, setIsCloseRightPanelDisabled] = useState(true);
   const [isConnectionError, setIsConnectionError] = useState(false);
-  const [startingText, setStartingText] = useState('Turning on');
+  const [startingText, setStartingText] = useState('Connecting to Copilot');
   const [dotCount, setDotCount] = useState(0);
   const progressBarRef = useRef(null);  
   const playPauseBtnRef = useRef<HTMLButtonElement>(null); // Add a ref for the play/pause button
+  const muteBtnRef = useRef<HTMLButtonElement>(null); // Add a ref for the play/pause button
   const audioRef = useRef<HTMLAudioElement | null>(null);  
   const videoRef = useRef<HTMLVideoElement | null>(null);  
+  const conversationDivRef = useRef<HTMLDivElement | null>(null);
+  const floatingButtonRef = useRef(null);
+  const leftRef = useRef<HTMLDivElement | null>(null);
+  const rightRef = useRef<HTMLDivElement | null>(null);
 
   const [numPages, setNumPages] = useState<number>();
-  const [pageNumber, setPageNumber] = useState<number>(1);
+  //const [pageNumber, setPageNumber] = useState<number>(1);
   const containerRef = useRef(null); // Ref for the scrollable container
   const pageRefs = useRef<React.RefObject<HTMLDivElement>[]>([]); // Array of refs for each page
   const [scale, setScale] = useState(1); // Zoom level
   const [renderedPages, setRenderedPages] = useState([1]); // Track pages rendered in the DOM
+
+  const timeUpdateHandlerRef = useRef<(this: HTMLAudioElement, ev: Event) => any>();
+  const endedHandlerRef = useRef<(this: HTMLAudioElement, ev: Event) => any>();
+  const [isLoop, setIsLoop] = useState(false);  
+
+  // Some times isConnected could not reflect the actual connection status due to the delay of the state update
+  // To solve this issue, we use a ref to store the actual connection status
+  const isConnectedRef = useRef(isConnected);
+  // Update the ref whenever `isConnected` changes
+  useEffect(() => {
+    isConnectedRef.current = isConnected;
+  }, [isConnected]);
+
+  interface FormatTimeProps {
+    time: number;
+  }  
 
   interface PageRefs {
     current: Array<React.RefObject<HTMLDivElement>>;
@@ -210,12 +211,197 @@ export function ConsolePage() {
     });    
   };
 
-  // Handle zooming
-  interface WheelZoomEvent extends React.WheelEvent<HTMLDivElement> {
-    ctrlKey: boolean;
-    deltaY: number;
+  const closeRightArrowNew = () => {
+    closeRightPanel();
+
+    const rightArrow = document.getElementById('openRightArrow');
+    if(rightArrow){
+      rightArrow.style.display = 'flex';
+    }
+
+    const closeRightArrow = document.getElementById('closeRightArrow');
+    if(closeRightArrow){
+      closeRightArrow.style.display = 'none';
+    }    
   }
 
+  const closeRightPanel = () => {
+    setIsCloseRightPanelDisabled(true);
+    const splitter = document.getElementById('splitter');
+    const chatBot = document.getElementById('chatContainer');
+    const rightPanel = rightRef.current;
+    if(rightPanel)
+    {
+      splitter.style.display = 'none';
+      (rightPanel as HTMLDivElement).style.display = 'none';
+      chatBot.style.display = 'none';
+      conversationDivRef.current.style.display = 'flex'; 
+
+      /* isMuted = true when UI button IS NOT Muted
+      if(!isMuted){
+        toggleMuteRecording();
+      }     */ 
+    }
+  }
+
+  //Show Conversion list
+  const showConversation = () => {
+    setIsCloseRightPanelDisabled(false);
+    const splitter = document.getElementById('splitter');
+    const chatBot = document.getElementById('chatContainer');
+
+    if((splitter as HTMLDivElement).style.display === 'flex'){
+      //(splitter as HTMLDivElement).style.display = 'none';
+      //rightRef.current.style.display = 'none';    
+      if(conversationDivRef.current.style.display === 'none') {
+        chatBot.style.display = 'none';
+        conversationDivRef.current.style.display = 'flex';        
+      }
+    }
+    else{
+      (splitter as HTMLDivElement).style.display = 'flex';
+      rightRef.current.style.display = 'flex';
+      chatBot.style.display = 'none';
+      conversationDivRef.current.style.display = 'flex';
+    }    
+    openRightPanel();  
+  };    
+
+  // Handle zooming of the PDF when the user clicks the '-' button
+  const zoomIn = () => {
+    setScale((prevScale) => Math.min(prevScale + 0.05, 3.0)); // Increase scale, max 3.0
+
+    const container = containerRef.current as HTMLDivElement | null;
+    if(container){
+      
+      const scrollTop = container.scrollTop;
+      const scrollLeft = container.scrollLeft;
+
+      // Calculate new scroll position based on the scale change
+      const newScrollTop = scrollTop * scale;
+      const newScrollLeft = scrollLeft * scale;      
+
+      container.scrollLeft = newScrollLeft;
+      container.scrollTop  = newScrollTop;
+    }
+  };
+
+  // Handle zooming of the PDF when the user clicks the '+' button  
+  const zoomOut = () => {
+    setScale((prevScale) => Math.max(prevScale - 0.05, 0.5)); // Decrease scale, min 0.5
+
+    const container = containerRef.current as HTMLDivElement | null;
+    if(container){
+      
+      const scrollTop = container.scrollTop;
+      const scrollLeft = container.scrollLeft;
+
+      // Calculate new scroll position based on the scale change
+      const newScrollTop = scrollTop * scale;
+      const newScrollLeft = scrollLeft * scale;      
+
+      container.scrollLeft = newScrollLeft;
+      container.scrollTop  = newScrollTop;
+    }    
+
+  };   
+
+  // Handle text are selected, show the popup to read aloud
+  let readAloudBuffer = null; // Global buffer to store the read aloud audio
+  const selectionTTS = async (input: string) => { 
+
+    if(readAloudBuffer) {
+      wavStreamPlayerRef.current.add16BitPCM(readAloudBuffer);
+    }else{
+      const pcm = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: "alloy",
+        response_format: "pcm",
+        speed: 1.0,
+        input: input,
+      });
+      const pcmArrayBuffer = await pcm.arrayBuffer(); // Convert the response to an ArrayBuffer
+      const int16Pcm = new Int16Array(pcmArrayBuffer);
+      wavStreamPlayerRef.current.add16BitPCM(int16Pcm);
+
+      chatRef.current.updateSelection(input);
+
+      const wavFile = await WavRecorder.decode(
+        int16Pcm,
+        24000,
+        24000
+      );    
+      chatRef.current.updateReadAloud(wavFile.url);
+
+      readAloudBuffer = int16Pcm;
+    }
+  }
+
+  // Test new connection to Realtime API by WebRTC
+  // Refer: https://platform.openai.com/docs/guides/realtime-webrtc
+  const test_webrtc = async () => {
+    // Get an ephemeral key from your server - see server code below
+    const tokenResponse = await fetch("http://localhost:3001/api/session");
+    const data = await tokenResponse.json();
+    const EPHEMERAL_KEY = data.client_secret.value;
+  
+    // Create a peer connection
+    const pc = new RTCPeerConnection();
+  
+    // Set up to play remote audio from the model
+    const audioEl = document.createElement("audio");
+    audioEl.autoplay = true;
+    pc.ontrack = e => audioEl.srcObject = e.streams[0];
+  
+    // Add local audio track for microphone input in the browser
+    const ms = await navigator.mediaDevices.getUserMedia({
+      audio: true
+    });
+    pc.addTrack(ms.getTracks()[0]);
+    
+
+    // Set up data channel for sending and receiving events
+    const dc = pc.createDataChannel("oai-events");
+    dc.addEventListener("message", (e) => {
+      // Realtime server events appear here!
+      console.log(e);
+    });   
+
+    // Start the session using the Session Description Protocol (SDP)
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+  
+    const baseUrl = "https://api.openai.com/v1/realtime";
+    const model = "gpt-4o-mini-realtime-preview-2024-12-17";
+    const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
+      method: "POST",
+      body: offer.sdp,
+      headers: {
+        Authorization: `Bearer ${EPHEMERAL_KEY}`,
+        "Content-Type": "application/sdp"
+      },
+    });
+ 
+    const answer = {
+      type: "answer",
+      sdp: await sdpResponse.text(),
+    };
+    await pc.setRemoteDescription(answer as RTCSessionDescriptionInit);
+
+    // JSON, and sending it over the data channel
+    /*
+    const responseCreate = {
+      type: "response.create",
+      response: {
+        modalities: ["text"],
+        instructions: "Write a haiku about code",
+      },
+    };
+    dc.send(JSON.stringify(responseCreate));     */
+  }  
+
+  // Try to prevent zoom in/out event for the whole page
+  // Status: logic not work yet
   const handleWheelZoom = (event: WheelEvent): void => {
     
     const buttonRow: HTMLDivElement | null = document.getElementById('button-row') as HTMLDivElement | null;
@@ -267,65 +453,6 @@ export function ConsolePage() {
     };
   }, [scale]);  
 
-  /*
-  const playerRef = useRef(null); // Ref to hold the YT.Player instance
-  useEffect(() => {
-
-    playerRef = new YT.Player('videoFrame', {
-  });    
-
-  }, []);
-  
-  useEffect(() => {
-    // Dynamically load the YouTube IFrame API script
-    const script = document.createElement("script");
-    script.src = "https://www.youtube.com/iframe_api";
-    script.async = true;
-    document.body.appendChild(script);
-
-    // Create the player when the script is loaded
-    (window as any).onYouTubeIframeAPIReady = () => {
-        playerRef.current = new window.YT.Player("videoFrame", {
-            videoId: "dQw4w9WgXcQ", // Replace with your video ID
-            events: {
-                onReady: onPlayerReady,
-                onStateChange: onPlayerStateChange,
-            },
-        });
-    };
-
-      // Cleanup script when the component unmounts
-      return () => {
-          document.body.removeChild(script);
-          delete window.onYouTubeIframeAPIReady; // Clean up global function
-      };
-  }, []);  */
-
-  /* Try to addTool for sending mail by voice
-  // Create a transporter object
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: 'helloqianfeng@gmail.com', // Replace with your Gmail address
-      pass: 'mgmz zicm yjwp xumx', // Replace with your Gmail password or App Password
-    },
-  });
-
-  const sendEmail = async (title: string, content: string, to: string) => {
-    try {
-      await transporter.sendMail({
-        from: 'helloqianfeng@gmail.com', // Replace with your Gmail address
-        to: to, // Receiver's email
-        subject: title, // Subject line
-        text: content, // Plain text body
-        html: `<p>${content}</p>`, // HTML body
-      });
-      console.log('Email sent successfully');
-    } catch (error) {
-      console.error('Error sending email:', error);
-    }
-  };*/
-
   //Dynamic effect of 'Copilot is turning on......' 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -335,7 +462,8 @@ export function ConsolePage() {
         setDotCount((prevCount) => (prevCount + 1) % 4); // Cycle through 0, 1, 2, 3
       }, 500);
     } else {
-      setStartingText(''); // Clear the text when not starting
+      //setStartingText(''); // Clear the text when not starting
+      setStartingText(`Connect${'.'.repeat(dotCount)}` + '\u00A0\u00A0\u00A0'); // Clear the text when not starting
     }
   
     return () => clearInterval(intervalId); // Cleanup interval on component unmount or when isMuteBtnDisabled changes
@@ -343,46 +471,28 @@ export function ConsolePage() {
 
   useEffect(() => {
     if (isMuteBtnDisabled) {
-      setStartingText(`Turning on${'.'.repeat(dotCount)}`);
+      //setStartingText(`Turning on${'.'.repeat(dotCount)}`);
+      //setStartingText(`Connecting${'.'.repeat(dotCount)}`);
+      if (dotCount === 0) {
+        setStartingText(`Connect${'.'.repeat(dotCount)}` + '\u00A0\u00A0\u00A0');
+      }
+      if (dotCount === 1) {
+        setStartingText(`Connect${'.'.repeat(dotCount)}` + '\u00A0\u00A0');
+      }
+      if (dotCount === 2) {
+        setStartingText(`Connect${'.'.repeat(dotCount)}` + '\u00A0');
+      } 
+      if (dotCount === 3) {
+        setStartingText(`Connect${'.'.repeat(dotCount)}`);
+      }            
     }
   }, [dotCount, isMuteBtnDisabled]);  
 
-  //Test copilot for video file
-  const toggleVisibility = () => {
-    setIsHidden(!isHidden);
-
-    if(isHidden) {
-
-      //audio is hidden, switch from audio to video
-      if (audioRef.current) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current = new Audio('./audio/ck_interview.mp3');
-      }
-      if (videoRef.current) {
-        videoRef.current.play();
-      }        
-    } else {
-      //video is hidden, swtich from video to audio
-      if (audioRef.current) {
-        audioRef.current.play();
-      }
-      else {
-        audioRef.current = new Audio('./audio/ck_interview.mp3');
-        //audioRef.current.play();
-      }
-
-      if (videoRef.current) {
-        videoRef.current.pause();
-      }  
-    }
-  };  
-
+  // Load the audio file when the component mounts
   useEffect(() => {
     audioRef.current = new Audio(audioFilePath);
-    //audioRef.current = new Audio('./audio/ngl_issue23_uk.wav');
 
-    //audioRef.current.onplay
+    //audioRef.current = new Audio('./audio/ngl_issue23_uk.wav');
     //videoRef.current = new Video('./video/ck_interview.mp4');
     return () => {
       if (audioRef.current) {
@@ -396,19 +506,7 @@ export function ConsolePage() {
     if (audioRef.current) {
       audioRef.current.playbackRate = playbackRate; // Set the playback speed
     }
-  }, [playbackRate]);
-
-  const playVideo = () => {
-    if (videoRef.current) {
-      videoRef.current.play();
-    }
-  };
-
-  const pauseVideo = () => {
-    if (videoRef.current) {
-      videoRef.current.pause();
-    }
-  };  
+  }, [playbackRate]); 
 
   const toggleCaptionVisibility = () => {
     setIsCaptionVisible(!isCaptionVisible);
@@ -425,10 +523,6 @@ export function ConsolePage() {
       const newFontSizeInEm = (currentFontSizeInEm + adjustment) > 3 ? 3 : ((currentFontSizeInEm + adjustment) < 1 ? 1 : (currentFontSizeInEm + adjustment)) ; // Adjust the font size
       captionDisplay.style.fontSize = `${newFontSizeInEm}em`;                  
     }      
-  }
-
-  interface FormatTimeProps {
-    time: number;
   }
 
   const formatDuration = ({ time }: FormatTimeProps): string => {
@@ -450,8 +544,135 @@ export function ConsolePage() {
     setPlaybackRate(speed);
     console.log(`Speed set to ${speed}`);
   };  
+  
+  const handleLoopClick = (event: SpeedControlClickEvent): void => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the progress bar
+
+    setIsLoop(!isLoop);
+  };    
+
+  const createHandleTimeUpdate = (audioElement: HTMLAudioElement, currentTime: number, endTime: number) => {
+    return () => {
+
+     /* if(!isLoop) {
+        if (timeUpdateHandlerRef.current) {
+          audioElement.removeEventListener('timeupdate', timeUpdateHandlerRef.current);
+        }          
+      }  */    
+      
+      if (audioElement.currentTime >= endTime) {
+        audioElement.currentTime = currentTime; // Reset to start time
+        audioElement.play();
+      }
+    };
+  };
+  
+  const createHandleEnded = (audioElement: HTMLAudioElement, currentTime: number, endTime: number) => {
+    return () => {
+
+      /*if(!isLoop) {
+        if (endedHandlerRef.current) {
+          audioElement.removeEventListener('ended', endedHandlerRef.current);
+        }          
+      }    */  
+
+      if (audioElement.currentTime < endTime) {
+        audioElement.currentTime = currentTime;
+        audioElement.play();
+
+      }
+    };
+  };  
+
+  const loopKeywordPlay = (event: SpeedControlClickEvent, keyword: string, currentTime: number, endTime: number, page: number) => {
+
+    setKeyword(keyword);
+    if (audioRef.current) {
+
+      // Remove any existing event listeners to prevent multiple registrations
+      if (timeUpdateHandlerRef.current) {
+        audioRef.current.removeEventListener('timeupdate', timeUpdateHandlerRef.current);
+      }
+      if (endedHandlerRef.current) {
+        audioRef.current.removeEventListener('ended', endedHandlerRef.current);
+      }      
+
+      goToPage({ pageNumber: page });
+      const pdfViewer = document.getElementById("pdfFile");
+      if (pdfViewer) {
+        (pdfViewer as HTMLObjectElement).data = pdfFilePath + `?t=` + (new Date()).getTime() + `#page=` + page;//&t=${new Date().getTime()}
+        console.log((pdfViewer as HTMLObjectElement).data);
+      }          
+
+      audioRef.current.currentTime = currentTime;
+
+      if(!isPlaying){
+        if (playPauseBtnRef.current) {
+          playPauseBtnRef.current.click(); // Trigger the button click event
+        }
+      }
+
+      //audioRef.current.play(); 
+/*
+      const handleTimeUpdate = () => {
+        if (audioRef.current && audioRef.current.currentTime >= endTime) {
+          audioRef.current.currentTime = currentTime; // Reset to start time
+          audioRef.current.play();
+        }
+      };
+  
+      const handleEnded = () => {
+        if (audioRef.current && audioRef.current.currentTime < endTime) {
+          audioRef.current.currentTime = currentTime;
+          audioRef.current.play();
+        }
+      }; 
+
+      audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+      audioRef.current.removeEventListener('ended', handleEnded);           
+      
+      audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+      audioRef.current.addEventListener('ended', handleEnded);      
+  
+      // Clean up event listeners when the audio is paused or stopped
+      audioRef.current.onpause = () => {
+        if (audioRef.current) {
+          audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+          audioRef.current.removeEventListener('ended', handleEnded);      
+        }
+      };*/
+      //if(isLoop) {
+        const handleTimeUpdate = createHandleTimeUpdate(audioRef.current, currentTime, endTime);
+        const handleEnded = createHandleEnded(audioRef.current, currentTime, endTime);
+
+        // Store event handlers in refs
+        timeUpdateHandlerRef.current = handleTimeUpdate;
+        endedHandlerRef.current = handleEnded;      
+
+        // Remove any existing event listeners to prevent multiple registrations
+        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+        audioRef.current.removeEventListener('ended', handleEnded);
     
-  const handleKeywordClick = (event: SpeedControlClickEvent, keyword: string, currentTime: number, page: number): void => {
+        audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
+        console.log('timeupdate event listener registered');
+    
+        audioRef.current.addEventListener('ended', handleEnded);
+        console.log('ended event listener registered');
+    
+        // Clean up event listeners when the audio is paused or stopped
+        audioRef.current.onpause = () => {
+          if (audioRef.current) {
+            audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+            audioRef.current.removeEventListener('ended', handleEnded);
+            console.log('event listeners removed');
+          }
+        };
+      //}            
+    }    
+
+  }
+  
+  const handleKeywordClick = (event: SpeedControlClickEvent, keyword: string, currentTime: number, endTime: number, page: number): void => {
     event.stopPropagation(); // Prevent the event from bubbling up to the progress bar
 
     setKeyword(keyword);
@@ -465,16 +686,6 @@ export function ConsolePage() {
         console.log((pdfViewer as HTMLObjectElement).data);
       }
     }
-/*
-    if (audioRef.current) {
-      if(index === 1)
-      {
-        audioRef.current.currentTime = 26;
-      }else if(index === 2)
-      {
-        audioRef.current.currentTime = 96;
-      }
-    }*/
   };    
 
   //Update the progress bar and current time when the audio is playing
@@ -566,6 +777,29 @@ export function ConsolePage() {
     };
   }, []);  
 
+  const handleSplitterMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsDragging(true);
+    setIsSplitterDragging(true);
+    resizePanel(e.nativeEvent);       
+  };  
+
+  const resizePanel = (e: MouseEvent | React.MouseEvent<HTMLDivElement>) => {
+    const rightPanel = rightRef.current;
+    const tempWidth = window.innerWidth - e.clientX - 12;
+    const newrightWidth = tempWidth > 700 ? 700 : tempWidth < 400 ? 400 : tempWidth;    
+    if(rightPanel)
+    {
+      (rightPanel as HTMLDivElement).style.width = `${newrightWidth}px`;
+    }
+
+    const closeRightArrow = document.getElementById('closeRightArrow');
+    if(closeRightArrow){
+      const newCloseRightArrowRight = newrightWidth + 15;
+      closeRightArrow.style.right = `${newCloseRightArrowRight}px`;
+    }      
+
+  };  
+
   useEffect(() => {
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
@@ -577,18 +811,103 @@ export function ConsolePage() {
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
       setIsDragging(true);
+      setIsProgressDragging(true);
       updateProgress(e.nativeEvent);
+
+      if (audioRef.current) {
+        if (timeUpdateHandlerRef.current) {
+          audioRef.current.removeEventListener('timeupdate', timeUpdateHandlerRef.current);
+        }
+        if (endedHandlerRef.current) {
+          audioRef.current.removeEventListener('ended', endedHandlerRef.current);
+        }     
+      }      
+
     };
 
   const handleMouseMove = (e: MouseEvent) => {
+
+    const buttonRowTop = document.getElementById('.button-row-top');
+    if ( buttonRowTop && e.clientY < 50) { // Adjust the value as needed
+      buttonRowTop.style.display = 'flex';
+    }    
+
     if (isDragging) {
-      updateProgress(e);
-    }
+      if (isProgressDragging) {
+        updateProgress(e);
+      }
+      if (isSplitterDragging) {
+        resizePanel(e);
+      }
+    }   
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: MouseEvent) => {
     setIsDragging(false);
+    setIsProgressDragging(false);
+    setIsSplitterDragging(false);
+
+    const selectedText = window.getSelection().toString().trim();
+  
+    // If no text is selected, remove the popup    
+    if (!selectedText) {
+      if (e.target !== currentPopup && currentPopup) {
+        currentPopup.remove();
+        currentPopup = null;
+        clearTimeout(popupTimeout);
+      }
+      return; // Exit early since no action is needed
+    }
+
+    if (selectedText && isConnectedRef.current) {
+      showPopup(e.clientX, e.clientY, selectedText);
+    }   
+
   };
+
+  let popupTimeout = null; // Global timeout variable to track dismissal
+  let currentPopup = null; // To keep track of the current popup  
+
+  const showPopup = (x, y, text) => {
+  // Clear previous popup and timeout if it exists
+  if (currentPopup) {
+    currentPopup.remove();
+    clearTimeout(popupTimeout);
+    readAloudBuffer = null; // Clear the buffer
+  }
+
+    const popup = document.createElement('div');
+    popup.id = 'readAloudPopup';
+    //popup.className = 'read-aloud-popup';
+    popup.textContent = 'Read Aloud';
+    popup.style.position = 'absolute';
+    popup.style.left = `${x + 10}px`; // Adjust position as needed
+    popup.style.top = `${y + 10}px`; // Adjust position as needed
+    popup.style.backgroundColor = '#fff';
+    popup.style.border = '1px solid #000';
+    popup.style.borderRadius = '4px';
+    popup.style.padding = '5px';
+    popup.style.cursor = 'pointer';
+    popup.onclick = () => selectionTTS(text);
+  
+  // Attach mouse leave event to manage timeout
+    popup.onmouseleave = () => {
+      popupTimeout = setTimeout(() => {
+        popup.remove();
+        currentPopup = null; // Reset the current popup
+        readAloudBuffer = null; // Clear the buffer
+      }, 1000); // 3-second delay
+    };
+
+  // Clear the timeout if the mouse re-enters
+    popup.onmouseenter = () => {
+      clearTimeout(popupTimeout);
+    };    
+
+    document.body.appendChild(popup);
+    currentPopup = popup;
+    readAloudBuffer = null; // Clear the buffer
+  }
 
   const updateProgress = (e: MouseEvent | React.MouseEvent<HTMLDivElement>) => {
       const progressBar = progressBarRef.current;
@@ -606,30 +925,30 @@ export function ConsolePage() {
       }
   };
 
-/**
- * Converts a standard YouTube video URL to an embeddable URL.
- * @param {string} url - The original YouTube video URL.
- * @returns {string | null} - The embeddable YouTube URL or null if invalid.
- */
-function convertToEmbedUrl(url: string): string | null {
-  // Regular expression to extract the video ID from the URL
-  const videoIdMatch = url.match(/(?:youtube\.com\/.*v=|youtu\.be\/)([^&]+)/);
-  
-  // Check if a video ID was found
-  if (videoIdMatch && videoIdMatch[1]) {
-    const videoId = videoIdMatch[1];
-    // Construct and return the embed URL
-    return `https://www.youtube.com/embed/${videoId}`;
-  } else {
-    // Return null if the URL is not a valid YouTube video URL
-    return null;
-  }
-}    
+  /**
+   * Converts a standard YouTube video URL to an embeddable URL.
+   * @param {string} url - The original YouTube video URL.
+   * @returns {string | null} - The embeddable YouTube URL or null if invalid.
+   */
+  function convertToEmbedUrl(url: string): string | null {
+    // Regular expression to extract the video ID from the URL
+    const videoIdMatch = url.match(/(?:youtube\.com\/.*v=|youtu\.be\/)([^&]+)/);
+    
+    // Check if a video ID was found
+    if (videoIdMatch && videoIdMatch[1]) {
+      const videoId = videoIdMatch[1];
+      // Construct and return the embed URL
+      return `https://www.youtube.com/embed/${videoId}`;
+    } else {
+      // Return null if the URL is not a valid YouTube video URL
+      return null;
+    }
+  }    
 
   //Display the Video Popup
   useEffect(() => {
     const closeButton = document.getElementById('closePopup');
-    const popupOverlay = document.getElementById('videoPopup');
+    const popupOverlay = document.getElementById('popupOverlay');
     const videoFrame = document.getElementById('videoFrame');  
     const searchBox = document.getElementById('searchBox');  
 
@@ -654,17 +973,23 @@ function convertToEmbedUrl(url: string): string | null {
     const handleKeyDown = (e: KeyboardEvent) => {
 
       const searchBox = document.getElementById('searchBox');        
+      const chatInputBox = document.getElementById('chatInputBox');    
       
       if (e.code === 'Space') {
-        if (e.target !== searchBox) {
+        //if (e.target !== searchBox || e.target !== chatInputBox) {
+          if (e.target !== chatInputBox) {
           e.preventDefault(); // Prevent default space bar action (scrolling)
           if (playPauseBtnRef.current) {
             playPauseBtnRef.current.click(); // Trigger the button click event
           }      
         }  
       } else if (e.code === 'Escape') {
+
+        //closeRightPanel();
+        closeRightArrowNew();
+
         // Close the popup when pressing the Escape key
-        const popupOverlay = document.getElementById('videoPopup');
+        const popupOverlay = document.getElementById('popupOverlay');
         if (popupOverlay) {
           const videoFrame = document.getElementById('videoFrame');
           if (videoFrame) {
@@ -787,25 +1112,49 @@ function convertToEmbedUrl(url: string): string | null {
     }
   }  
 
+  // Handle function calls from the Chatbot
+  // e.g. get_news, get_video, etc.
+  const functionCallHandlerForChat = async (call): Promise<string> => {   
+    const args = JSON.parse(call.function.arguments);
+    if (call?.function?.name === "get_video") {     
+      return performYoutubeSearch(args.query)
+      .then((results) => {
+        if (results.length > 0) {
+          // Access the first result
+          const firstResult = results[0];
+          
+          // Convert to embeddable URL
+          const embedUrl = convertToEmbedUrl(firstResult.url);
+          
+          if (embedUrl) {
+            // Assistant message of Chat will render the youtube video in iframe
+            return `<iframe width="100%" height="68%" src="${embedUrl}" style={{ borderRadius: '9px'}} allowfullscreen></iframe>`;
+          } else {
+            return 'Failed to convert to embeddable URL.';
+          }
+        } else {
+          return 'No results found.';
+        }
+      })
+      .catch((error) => {
+        return 'Error occurred during YouTube search';
+      });           
+    } 
+    return '';
+  };
+
   /*
-  * Utility for search Videos by Youtube by addTool
+   * Utility for search Videos by Youtube by addTool
+   * it will be called back from Realtime API and a popup will be displayed
    */
   const showVideofromYoutube = async (query: string) => {
 
     const searchBox = document.getElementById('searchBox');
-    const popupOverlay = document.getElementById('videoPopup');
+    const popupOverlay = document.getElementById('popupOverlay');
     const videoFrame = document.getElementById('videoFrame');
     const popupContent = document.getElementById('popupContent');
     const chatBot = document.getElementById('chatBot');
-
-    /*(videoFrame as HTMLIFrameElement).src = embedUrl;
-    if (popupOverlay){
-      popupOverlay.style.display = 'flex';
-      clearTimerforSearchBox(query);
-      (searchBox as HTMLInputElement).style.color = 'blue'; // Reset the color
-    }  */  
-
-    
+   
     performYoutubeSearch(query)
     .then((results) => {
       if (results.length > 0) {
@@ -827,6 +1176,10 @@ function convertToEmbedUrl(url: string): string | null {
             popupOverlay.style.display = 'flex';
             clearTimerforSearchBox(query);
             (searchBox as HTMLInputElement).style.color = 'blue'; // Reset the color
+
+            //insert the video searched into the conversation list
+            chatRef.current.updateVideo(`<iframe width="100%" height="68%" src="${embedUrl}" style={{ borderRadius: '9px'}} allowfullscreen></iframe>`);
+            //return `<iframe width="100%" height="68%" src="${embedUrl}" style={{ borderRadius: '9px'}} allowfullscreen></iframe>`;
           }
         } else {
           //clearTimerforSearchBox('Failed to convert to embeddable URL.');
@@ -845,7 +1198,7 @@ function convertToEmbedUrl(url: string): string | null {
   }
   
   /**
-   * Utility for search Videos by Youtube by addTool
+   * Utility for search Videos from Youtube by SERP_API
    */
   async function performYoutubeSearch(query: string): Promise<Array<{ title: string, url: string }>> {
     try {
@@ -873,24 +1226,72 @@ function convertToEmbedUrl(url: string): string | null {
     }
   }    
 
-  const openChatbot = () => {
-    const chatBot = document.getElementById('chatBot');
-    const popupOverlay = document.getElementById('videoPopup');
-    const videoFrame = document.getElementById('videoFrame');
-    const popupContent = document.getElementById('popupContent');
+  const scrollToBottom = (element: HTMLElement) => {
+    element.scrollTop = element.scrollHeight;
+  };  
 
-    if (popupOverlay){
-      popupOverlay.style.display = 'flex';
-      (videoFrame as HTMLIFrameElement).style.display = 'none';
-      (chatBot as HTMLIFrameElement).style.display = 'flex'; 
-      (popupContent as HTMLIFrameElement).className = 'popup-content-chat';       
-    }    
+  const openRightPanel = () => {
+    //openChatbot();
+
+    const rightArrow = document.getElementById('openRightArrow');
+    if(rightArrow){
+      rightArrow.style.display = 'none';
+    }
+
+    const closeRightArrow = document.getElementById('closeRightArrow');
+    const rightPanel = rightRef.current;
+    if(closeRightArrow){
+      closeRightArrow.style.display = 'flex';
+
+      const computedStyle = getComputedStyle(rightPanel);
+      const rightPanelWidth = computedStyle.width;      
+
+      const newCloseRightArrowRight = parseInt(rightPanelWidth, 10) + 15;
+      closeRightArrow.style.right = `${newCloseRightArrowRight}px`;
+    }        
+
+  }
+
+  const openChatbot = () => {
+    setIsCloseRightPanelDisabled(false);
+
+    const splitter = document.getElementById('splitter');
+    const chatBot = document.getElementById('chatContainer');
+
+    if((splitter as HTMLDivElement).style.display === 'flex'){   
+      if(chatBot.style.display === 'none') {
+        chatBot.style.display = 'flex';
+        conversationDivRef.current.style.display = 'none';        
+      }
+    }
+    else{
+      (splitter as HTMLDivElement).style.display = 'flex';
+      rightRef.current.style.display = 'flex';
+      chatBot.style.display = 'flex';
+      conversationDivRef.current.style.display = 'none';
+    }
+
+    scrollToBottom(rightRef.current);
+    rightRef.current.scrollIntoView({ behavior: 'smooth' });
+
+    openRightPanel();    
+/*
+    if(!isMuted){
+      toggleMuteRecording();
+    }*/
   }
 
   const toggleMuteRecording = async () => {
     if (wavRecorderRef.current && clientRef.current) {
       if (isMuted) {
         await unmuteRecording();
+
+        const client = clientRef.current;
+        if (client.isConnected()){
+          //showConversation();
+          openChatbot();
+        }         
+
       } else {
         await muteRecording();
       }
@@ -900,7 +1301,8 @@ function convertToEmbedUrl(url: string): string | null {
     const apiKey = localStorage.getItem('tmp::voice_api_key')
     if (apiKey == '' || !clientRef.current.isConnected() || isConnectionError) {
       setIsMuted(true);
-    }        
+    }       
+    
   };
 
   /*
@@ -912,8 +1314,18 @@ function convertToEmbedUrl(url: string): string | null {
     const client = clientRef.current;
     if (client.isConnected()){
       setIsMuted(false);
+
       const wavRecorder = wavRecorderRef.current;      
       await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+      //for test, to trigger start of conversation
+      /*      
+      client.sendUserMessageContent([
+        {
+          type: `input_text`,
+          text: `Hello!`,
+          // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+        },
+      ]);     */
     } else {
       setIsMuteBtnDisabled(true);
       switchAudioCopilot('server_vad');
@@ -961,15 +1373,14 @@ function convertToEmbedUrl(url: string): string | null {
     // Set state variables
     startTimeRef.current = new Date().toISOString();
     setRealtimeEvents(realtimeEvents);
-    //setItems(client.conversation.getItems());
+    setItems(client.conversation.getItems());
     setItems(items);
+    await chatRef.current.updateItems(client.conversation.getItems());
 
 
     try{
       setIsConnectionError(false);
       // Connect to realtime API
-      // debug finding: even without API_KEY is not set, the connection is still established
-      // websocket connection is established, but the API_KEY is not set
   
       const apiKey = LOCAL_RELAY_SERVER_URL
         ? ''
@@ -981,8 +1392,20 @@ function convertToEmbedUrl(url: string): string | null {
       } else if (apiKey !== '') {
         localStorage.setItem('tmp::voice_api_key', apiKey);
 
-        client.realtime.apiKey = apiKey;
-        await client.connect();
+        client.realtime.apiKey = apiKey;        
+        //await client.connect();        
+        /*  To use the latest model: 'gpt-4o-realtime-preview-2024-12-17' 
+                                  or 'gpt-4o-mini-realtime-preview-2024-12-17'
+            with lower cost, call the inside logic of client.connect() directly */
+        //And also avoid touching codes of RealtimeClient.connect() and RealtimeAPI.connect()
+        if (client.isConnected()) {
+          throw new Error(`Already connected, use .disconnect() first`);
+        }
+        //await client.realtime.connect({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+        await client.realtime.connect({ model: 'gpt-4o-mini-realtime-preview-2024-12-17' });
+        client.updateSession();      
+        /* End of inside logic client.connect() */
+
       } else {
         setIsMuteBtnDisabled(false);        
       }
@@ -1003,11 +1426,6 @@ function convertToEmbedUrl(url: string): string | null {
     //setRealtimeEvents([]);
     //setItems([]);
     setMemoryKv({});
-    setCoords({
-      lat: 37.775593,
-      lng: -122.418137,
-    });
-    setMarker(null);
 
     const client = clientRef.current;
     client.disconnect();
@@ -1020,7 +1438,7 @@ function convertToEmbedUrl(url: string): string | null {
 
   }, []);
 
-  /**
+  /** Test for capturing audio from other apps
    * Capture audio from other apps, e.g. Microsoft Teams, 
    * This could be a new feature for Audio Copilot to prepare an reference answer when user is 
    * in an interview or in a customer-facing issue resolution.
@@ -1206,7 +1624,7 @@ function convertToEmbedUrl(url: string): string | null {
     client.updateSession({ turn_detection: { type: 'server_vad' } });    
     // hanks
 
-    // Add tools
+    // Add tools - Functions(Calling) that can be called by the client
     client.addTool(
       {
         name: 'set_memory',
@@ -1234,49 +1652,6 @@ function convertToEmbedUrl(url: string): string | null {
           return newKv;
         });
         return { ok: true };
-      }
-    );
-    client.addTool(
-      {
-        name: 'get_weather',
-        description:
-          'Retrieves the weather for a given lat, lng coordinate pair. Specify a label for the location.',
-        parameters: {
-          type: 'object',
-          properties: {
-            lat: {
-              type: 'number',
-              description: 'Latitude',
-            },
-            lng: {
-              type: 'number',
-              description: 'Longitude',
-            },
-            location: {
-              type: 'string',
-              description: 'Name of the location',
-            },
-          },
-          required: ['lat', 'lng', 'location'],
-        },
-      },
-      async ({ lat, lng, location }: { [key: string]: any }) => {
-        setMarker({ lat, lng, location });
-        setCoords({ lat, lng, location });
-        const result = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,wind_speed_10m`
-        );
-        const json = await result.json();
-        const temperature = {
-          value: json.current.temperature_2m as number,
-          units: json.current_units.temperature_2m as string,
-        };
-        const wind_speed = {
-          value: json.current.wind_speed_10m as number,
-          units: json.current_units.wind_speed_10m as string,
-        };
-        setMarker({ lat, lng, location, temperature, wind_speed });
-        return json;
       }
     );
     // hanks - Capabilities of Aduio Copilot
@@ -1443,7 +1818,7 @@ function convertToEmbedUrl(url: string): string | null {
     client.addTool(
       { //Jury's feedback: What if it could interpret what Copilot hear into local language in realtime? 
         //e.g. Copilot hears English, and translate it into Chinese in realtime
-        //This helps listners to consume the audio in the local language
+        //This helps listeners to consume the audio in the local language
         name: 'translation_current_sentence',
         description:
           'translate the current sentence to the target language, by default, it is Chinese if not specified target language',
@@ -1471,6 +1846,30 @@ function convertToEmbedUrl(url: string): string | null {
       }
     );    
     client.addTool(
+      { //When a listener wants to learn or explore the content of the audio by the keyword
+        name: 'learn_by_keyword',
+        description:
+          'learn the content of the audio by the keyword',
+        parameters: {
+          type: 'object',
+          properties: {
+            keyword: {
+              type: 'string',
+              description: 'topic keyword to learn/explore',
+            },
+          },          
+        },
+      },
+      async ({ keyword }: { [key: string]: any }) => {       
+        if( keyword in keywords) {
+          const range = keywords[keyword as keyof typeof keywords];
+          return [range[0], range[1]];
+        } else {
+          return { ok: false, info: 'No such a keyword' };
+        }
+      }
+    );        
+    client.addTool(
       { //Capabilities demo: when a lister wants to provide feedback
         //or similarly, sharing it to a friend...
         name: 'feedback_collection',
@@ -1496,7 +1895,7 @@ function convertToEmbedUrl(url: string): string | null {
       }
     );
     client.addTool(
-      { //Capabilities demo: when a lister wants to send a mail to a friend
+      { //Capabilities demo: when a listener wants to send a mail to a friend
         name: 'send_mail',
         description:
           'help the user to send the mail to a specific Recipient',
@@ -1565,9 +1964,14 @@ function convertToEmbedUrl(url: string): string | null {
           24000,
           24000
         );
-        item.formatted.file = wavFile;
+        item.formatted.file = wavFile;        
       }
       setItems(items);
+
+      // Pass the latest items to the chat component
+      // This will trigger a re-render of the chat component,e.g transcript will be updated
+      // audio stream will be decoded and replayed in the chat lis
+      await chatRef.current.updateItems(items);
     });
 
     // hanks - Pause on-going playback when speech is detected
@@ -1583,7 +1987,14 @@ function convertToEmbedUrl(url: string): string | null {
         videoRef.current.pause();
         setIsPlaying(false);
       }
-    });     
+    });   
+    client.realtime.on('server.conversation.item.created', async (event) => {
+      const { item, delta } = client.conversation.processEvent(event);
+      await chatRef.current.updateItems(client.conversation.getItems());
+
+      // insert one audio message to the chat list
+      await chatRef.current.updateItemID(item.id); 
+    });      
     // Copilot will be activated at the first click of the mute button to unmute to ask for the first question
     client.realtime.on('server.session.created', async () => {
       //when a new connection is established as this first server event received
@@ -1613,6 +2024,7 @@ function convertToEmbedUrl(url: string): string | null {
     // hanks
 
     setItems(client.conversation.getItems());
+    chatRef.current.updateItems(client.conversation.getItems());
 
     return () => {
       // cleanup; resets to defaults
@@ -1620,113 +2032,326 @@ function convertToEmbedUrl(url: string): string | null {
     };
   }, []);
 
+  interface DragEvent extends React.MouseEvent<HTMLDivElement> {
+    clientX: number;
+    clientY: number;
+  }
+
+  interface FloatingButtonElement extends HTMLDivElement {
+    dragOffsetX: number;
+    dragOffsetY: number;
+  }
+
+  const handleDragStart = (e: DragEvent): void => {
+    const button = floatingButtonRef.current;
+    if (button) {
+      const rect = (button as FloatingButtonElement).getBoundingClientRect();
+      (button as FloatingButtonElement).dragOffsetX = e.clientX - rect.left;
+      (button as FloatingButtonElement).dragOffsetY = e.clientY - rect.top;
+    }
+  };
+
+  interface DragEvent extends React.MouseEvent<HTMLDivElement> {
+    clientX: number;
+    clientY: number;
+  }
+
+  interface FloatingButtonElement extends HTMLDivElement {
+    dragOffsetX: number;
+    dragOffsetY: number;
+  }
+
+  const handleDrag = (e: DragEvent): void => {
+    if (e.clientX === 0 && e.clientY === 0) return; // Ignore invalid drag events
+    const button = floatingButtonRef.current as FloatingButtonElement | null;
+    if (button) {
+      button.style.left = `${e.clientX - button.dragOffsetX}px`;
+      button.style.top = `${e.clientY - button.dragOffsetY}px`;
+    }
+  };
+
+/**
+   * Disconnect and reset conversation state
+   */
+const disconnectConversation = useCallback(async () => {
+  setIsConnected(false);
+  setRealtimeEvents([]);
+  setItems([]);
+  await chatRef.current.updateItems([]);
+  setMemoryKv({});
+
+  const client = clientRef.current;
+  client.disconnect();
+
+  const wavRecorder = wavRecorderRef.current;
+  await wavRecorder.end();
+
+  const wavStreamPlayer = wavStreamPlayerRef.current;
+  await wavStreamPlayer.interrupt();
+
+  setIsMuteBtnDisabled(false);
+  setIsMuted(true);
+}, []);  
+
+/**
+ * Disconnect and reset conversation state
+ */
+const disConnnectRealtimeAPI = async () => {
+  disconnectConversation();
+  closeRightArrowNew();
+}
+
+/**
+ * Connect and start conversation/Chatbot
+ */
+const connnectRealtimeAPI = async () => {
+  if(muteBtnRef.current) {
+    muteBtnRef.current.click(); // Trigger the button click event   
+  }      
+};  
+
+//Test for variable evaluation in template string dynamically
+let audioUrl = "";
+let transcript = "";
+const getMarkdownContent = () => `
+${transcript}  
+<audio src="${audioUrl}" controls></audio>
+`; 
+
+
   /**
    * Render the application
    */
   return (
     <div data-component="ConsolePage">
-      {/* Original content-top from openai-realtime-console  is hidden */}
-      <div className="content-top">
-        <div className="content-title">
-          <img src="/resource/great_developer.jpg" />
-          <span>An <span>Audio Copilot</span> Empowered by LLM</span>
-        </div>
-        <div className="content-api-key">
-          {!LOCAL_RELAY_SERVER_URL && (
-            <Button
-              icon={Edit}
-              iconPosition="end"
-              buttonStyle="flush"
-              label={`api key: ${apiKey.slice(0, 3)}...`}
-              onClick={() => resetAPIKey()}
-            />
-          )}
-        </div>
-      </div>      
-      {/* Popup Layer for display the video from youtube search  */}      
-      <div id="videoPopup" className="popup-overlay">
+      
+      {/* Popup Layer for display the video from youtube search or AI Chatbot  */}      
+      <div id="popupOverlay" className="popup-overlay">
         <div id="popupContent" className="popup-content-chat">
-          <span id="closePopup" className="close-button">&times;</span>
+          <span id="closePopup" className="close-button"><X /></span>
           <iframe id="videoFrame" width="1000" height="562.5" src="" allow="fullscreen" allowFullScreen style={{display: 'none'}}></iframe>
-          <iframe id="chatBot" width="100%" height="100%" src="http://localhost:4000/examples/audio-copilot" allow="fullscreen" allowFullScreen style={{display: 'none'}}></iframe>
+          <iframe id="chatBot" width="100%" height="100%" src="http://localhost:4000/examples/audio-copilot" allow="fullscreen" allowFullScreen style={{display: 'none', borderRadius: '9px'}}></iframe> 
         </div>
       </div>
-      {/* Area to display PDF Magzine */}
-      {/* object to display PDF file 
-      <div>
-        <object id="pdfFile" data={pdfFilePath} type="application/pdf" width="100%" height="672px">
-          {<p>Your browser does not support PDFs. <a href={pdfFilePath}>Download the PDF</a>.</p> }
-        </object>        
-      </div>  */}
-      {/* Use PDF-REACT to display the PDF file: https://github.com/wojtekmaj/react-pdf    
 
-      <div ref={containerRef}  // Attach zoom handler to this container only
-          style={{       
-            margin: '0 auto',       // Center horizontally
-            width: '100%',           // Adjust the width as needed
-            overflowY: 'auto',      // Enable scrolling
-            height: '100vh',        // Full height of the viewport
-            backgroundColor: '#f4f4f4', // Optional: background color
-      }}>
-        <Document file={pdfFilePath} onLoadSuccess={onDocumentLoadSuccess}>
+      {/* Test Floating button */}
+      { (items.length < 0) && (!isCaptionVisible) &&
+        <div className="floating-button" ref={floatingButtonRef}  
+             onMouseDown={handleDragStart}
+             onMouseMove={handleDrag}
+        >
+          <Button
+            style={{ height: '10px'}}
+            label={'Conversation List'}
+            buttonStyle={'flush'}
+            onClick={showConversation}
+            className='button'
+          />
+        </div>}    
 
-          {Array.from(new Array(numPages), (el, index) => (
-                <div
-                  ref={pageRefs.current[index]}
-                  key={`page_${index + 1}`}
-                  style={{
-                    marginBottom: '10px',
-                    flexShrink: 0, // Prevent shrinking
-                    margin: '20px auto', // Center the page horizontally
-                    width: 'fit-content', // Shrink wrapper to fit content width                    
-                  }}
-                >
-                  <Page pageNumber={index + 1} 
-                        renderTextLayer={false} 
-                        renderAnnotationLayer={false} 
-                        onLoadSuccess={() => onPageLoadSuccess({ pageNumber: index + 1 })}
-                        scale={scale}   />
+      {/* Top buttons in row to control PDF operation */}
+      <div className="top-hover-area">
+      <div id='button-row-top' className='button-row-top'>
+        <Button
+          style={{height: '10px'}}
+          label={''}
+          icon={Plus}
+          buttonStyle={'flush'}
+          onClick={zoomIn}
+          className='button'
+        />
+        <Button
+          style={{height: '10px'}}
+          label={''}
+          icon={Minus}
+          buttonStyle={'flush'}
+          onClick={zoomOut}
+          className='button'
+        />     
+        <Button
+          style={{height: '10px'}}
+          label={'WebRTC Test'}
+          onClick={test_webrtc}
+        />
+        <div className="right-buttons">
+          {/*<div style={{ fontSize: '1em' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Error Occurred!</span></> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div> */}
+          <div>
+            <Button
+                label={isConnected ? 'Disconnect' : (isMuteBtnDisabled ? startingText : 'Connect\u00A0\u00A0\u00A0' ) }
+                iconPosition={isConnected ? 'end' : 'start'}
+                icon={isConnected ? X : Zap}
+                //buttonStyle={isConnected ? 'regular' : 'action'}
+                disabled={isMuteBtnDisabled}
+                onClick={ isConnected ? disConnnectRealtimeAPI : connnectRealtimeAPI }
+              />    
+          </div>                        
+          <div className="content-api-key">
+            {!LOCAL_RELAY_SERVER_URL && (
+              <Button
+                icon={Edit}
+                iconPosition="end"
+                buttonStyle="flush"
+                label={`\u00A0`}
+                title="Reset the OpenAI API Key"
+                onClick={() => resetAPIKey()}
+              />
+            )}
+          </div>  
+        </div>      
+      </div>
+      </div>
+
+      <div className="content-main" ref={leftRef}>
+
+        {/* Left Area to display PDF Magzine */}
+        {/*First div is to control display the scrollbar*/}
+        <div style={{
+          display: 'none', 
+        }}>
+          <PdfViewerWithIcons
+            pdfFilePath={pdfFilePath} // Path to the PDF file
+          />
+        </div>         
+        <div style={{
+          display: 'flex',        // Enable flexbox
+          //display: 'none',        // Enable flexbox
+          margin: '0 auto',       // Center horizontally
+          //marginTop: '2.5em', 
+          width: '100%',           // Adjust the width as needed
+          overflowY: 'auto',      // Enable scrolling
+          scrollbarWidth: 'auto',
+          top: '400px', 
+        }}>
+          <div ref={containerRef}  // Attach zoom handler to this container only
+                    style={{       
+                      margin: '0 auto',       // Center horizontally
+                      width: '100%',           // Adjust the width as needed
+                      overflowY: 'auto',      // Enable scrolling
+                      scrollbarWidth: 'none', // Hide scrollbar 
+                      top: '400px',               // Top of the viewport
+                      backgroundColor: 'white', // Optional: background color
+                      transform: `scale(${scale})`, // Apply CSS transform for zooming
+                      transformOrigin: 'top center', // Set the origin for the transform                    
+                }}>
+            <Document file={pdfFilePath} onLoadSuccess={onDocumentLoadSuccess}>
+
+              {renderedPages.map((pageNumber) => (
+                    <div
+                    ref={pageRefs.current[pageNumber]}
+                    key={`page_${pageNumber + 1}`}
+                    style={{
+                      marginBottom: '10px',
+                      flexShrink: 0, // Prevent shrinking
+                      margin: '20px auto', // Center the page horizontally
+                      width: 'fit-content', // Shrink wrapper to fit content width                    
+                    
+                    }}
+                  >            
+                <Page
+                  key={`page_${pageNumber}`}
+                  pageNumber={pageNumber}
+                  renderTextLayer={true} 
+                  renderAnnotationLayer={false}               
+                  onLoadSuccess={() => onPageLoadSuccess({ pageNumber })} // Incrementally add pages
+                  loading={<p>Loading page {pageNumber}...</p>} // Page loading indicator
+                />
                 </div>
-          ))}
-        </Document>
-      </div> */}
+              ))}
 
-      <div ref={containerRef}  // Attach zoom handler to this container only
-                style={{       
-                  margin: '0 auto',       // Center horizontally
-                  width: '100%',           // Adjust the width as needed
-                  overflowY: 'auto',      // Enable scrolling
-                  height: '100vh',        // Full height of the viewport
-                  backgroundColor: '#f4f4f4', // Optional: background color
-            }}>
-        <Document file={pdfFilePath} onLoadSuccess={onDocumentLoadSuccess}>
+            </Document>
+          </div> 
+        </div>
 
-          {renderedPages.map((pageNumber) => (
-                <div
-                ref={pageRefs.current[pageNumber]}
-                key={`page_${pageNumber + 1}`}
-                style={{
-                  marginBottom: '10px',
-                  flexShrink: 0, // Prevent shrinking
-                  margin: '20px auto', // Center the page horizontally
-                  width: 'fit-content', // Shrink wrapper to fit content width                    
-                }}
-              >            
-            <Page
-              key={`page_${pageNumber}`}
-              pageNumber={pageNumber}
-              renderTextLayer={false} 
-              renderAnnotationLayer={false}               
-              onLoadSuccess={() => onPageLoadSuccess({ pageNumber })} // Incrementally add pages
-              loading={<p>Loading page {pageNumber}...</p>} // Page loading indicator
-            />
-            </div>
-          ))}
+        {/* Splitter Area */}
+        {/* Open(Left Arrow<-) or Close((Right Arrow->)) Right Panel */}
+        <div className="tooltip-container">
+        <div id="openRightArrow" className="close-icon-right" onClick={openChatbot} style={{display: (isConnected? "flex": "none")}}><ArrowLeft style={{ width: '15px', height: '15px' }} /></div>
+        <div className="tooltip"><span><strong className='tooltip-title'>Open Chatbot</strong></span></div></div>
+        <div id="closeRightArrow" className="close-icon-left" onClick={closeRightArrowNew} style={{display: "none"}}><ArrowRight style={{ width: '15px', height: '15px' }} /></div>
+        <div id="splitter" className="splitter" onMouseDown={handleSplitterMouseDown} style={{display: "none"}}></div>
 
-        </Document>
-      </div> 
+        {/* Right Area: show the chatbot and conversation list on the right side panel */}
+        <div className="content-right" ref={rightRef} style={{display: "none"}}>
+          <div id="chatContainer" style={{display: "none"}}><Chat functionCallHandler={functionCallHandlerForChat} ref={chatRef} /></div>
 
-      {/* Bellow toolbar area to display different buttons, captions, progress bar, mute/unmute button */}
+          <div className="content-main" ref={conversationDivRef} style={{display: "none"}}>
+                <div className="content-logs">
+                  <div className="content-block conversation">
+                    {/*<div className="content-block-title">Conversation List</div>*/}
+                    <div className="content-block-body" data-conversation-content>
+                      {/*{!items.length && `awaiting connection...`}*/}
+                      {!items.length && `Conversation List`}
+                      {items.map((conversationItem, i) => {
+                        return (
+                          <div className="conversation-item" key={conversationItem.id}>
+                            <div className={`speaker ${conversationItem.role || ''}`}>
+                              <div>
+                                {(
+                                  conversationItem.role || conversationItem.type
+                                ).replaceAll('_', ' ')}
+                              </div>
+                              <div
+                                className="close"
+                                onClick={() =>
+                                  deleteConversationItem(conversationItem.id)
+                                }
+                              >
+                                <X />
+                              </div>
+                            </div>
+                            <div className={`speaker-content`}>
+                              {/* tool response */}
+                              {conversationItem.type === 'function_call_output' && (
+                                <div>{conversationItem.formatted.output}</div>
+                              )}
+                              {/* tool call */}
+                              {!!conversationItem.formatted.tool && (
+                                <div>
+                                  {conversationItem.formatted.tool.name}(
+                                  {conversationItem.formatted.tool.arguments})
+                                </div>
+                              )}
+                              {!conversationItem.formatted.tool &&
+                                conversationItem.role === 'user' && (
+                                  <div>
+                                    {conversationItem.formatted.transcript ||
+                                      (conversationItem.formatted.audio?.length
+                                        ? '(awaiting transcript)'
+                                        : conversationItem.formatted.text ||
+                                          '(item sent)')}
+                                  </div>
+                                )}
+                              {!conversationItem.formatted.tool &&
+                                conversationItem.role === 'assistant' && (
+                                  <div>
+                                    {conversationItem.formatted.transcript ||
+                                      conversationItem.formatted.text ||
+                                      '(truncated)'}
+                                  </div>
+                                )}
+                              {conversationItem.formatted.file && (() => {
+                                  console.log("Audio URL:", conversationItem.formatted.file.url); 
+                                  //console.log("Audio:", conversationItem.status);
+                                  return (
+                                    <audio
+                                      src={conversationItem.formatted.file.url}
+                                      controls
+                                    />
+                                  );
+                                })()
+                              }
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom toolbar area to display different buttons, captions, progress bar, mute/unmute button */}
       <div id='button-row' className='button-row'>
         {/* Adjust the caption font size if it is visible */}
         {isCaptionVisible && ( 
@@ -1734,7 +2359,8 @@ function convertToEmbedUrl(url: string): string | null {
             <div className="captionFont" style={{cursor:'pointer'}} onClick={() => {adjustCaptionFontSize(+0.1)}}>+</div>
             <div className="captionFont" style={{cursor:'pointer'}} onClick={() => {adjustCaptionFontSize(-0.1)}}>-</div>            
           </div> )
-        }         
+        }
+
         {/* Add a div to display the current caption */}
         {isCaptionVisible && ( 
           <div id='captionDisplay' className="caption-display"
@@ -1743,22 +2369,14 @@ function convertToEmbedUrl(url: string): string | null {
           ></div> )
         } 
         <div className="content-caption">
-          <div className="tooltip-container">
-            <Button
-                  label={isCaptionVisible ? 'Hide Captions' : 'Show Captions'}
-                  buttonStyle={'regular'}
-                  onClick={toggleCaptionVisibility}
-                  className='button'
-                />  
-            {isCaptionVisible && ( 
-              <div className="tooltip">
-                <span>-</span>
-                <span>  </span>
-                <span>+</span>                                 
-              </div>   )
-            }                                
-          </div>
+          <Button
+                    label={isCaptionVisible ? 'Hide Captions' : 'Show Captions'}
+                    buttonStyle={'regular'}
+                    onClick={toggleCaptionVisibility}
+                    className='button'
+                  />           
         </div>
+
         {/* This hidden button is to receive space bar down event to play/pause the audio */}
         <button ref={playPauseBtnRef} onClick={toggleAudio} className='hidden-button'></button>
         <div className="tooltip-container">
@@ -1774,18 +2392,17 @@ function convertToEmbedUrl(url: string): string | null {
             <span>Press Space(空格键) to <> {isPlaying ? 'Pause' : 'Play'} </> the on-going Audio</span><br />
           </div>             
         </div>
-        {/* Progress area */}
+
+        {/* Progress bar area */}
         <div 
           ref={progressBarRef}
           style={{position: 'relative', width: '60%', backgroundColor: '#ccc', height: '0.625em', borderRadius: '0.3125em', marginTop: '0.2em', marginLeft: '-1px' }}
           onMouseDown={handleMouseDown}>
-          <div
-            style={{
-              width: `${progress}%`,
-              backgroundColor: '#007bff',
-              height: '0.625em',
-              borderRadius: '0.3125em'
-            }}
+          <div style={{ 
+                        width: `${progress}%`,
+                        backgroundColor: '#007bff',
+                        height: '0.625em',
+                        borderRadius: '0.3125em' }}
           />
           {/* Three Speed control Options at the left-down of progress area */}
           <div className="speed-controls" onMouseDown={(e) => {
@@ -1807,8 +2424,16 @@ function convertToEmbedUrl(url: string): string | null {
               borderRadius: '0.3125em',
             }}    onClick={(e) => handleSpeedControlClick(e, 1.2)}>Faster</div>  
             <div></div>
+            <div className="speed-control"         style={{
+              display: 'none',
+              backgroundColor: isLoop === true ? '#666' : '#ccc', // Darker if active
+              color: isLoop === true ? '#fff' : '#000', // Adjust text color for contrast
+              borderRadius: '0.3125em',
+            }}    onClick={(e) => handleLoopClick(e)}>Loop</div>  
+            <div className="spacer" />           
             <div>Keywords:</div>
-            {Object.entries(keywords).map(([key, [value1, value2]], index) => (
+            {/* Click keyword to go to specific page and seek the current time */}
+            {Object.entries(keywords).map(([key, [value1, value2, value3]], index) => (
               <div
                 key={index} // Use index as the key for React
                 className="keyword"
@@ -1818,7 +2443,8 @@ function convertToEmbedUrl(url: string): string | null {
                   borderRadius: '0.3125em',
                   whiteSpace: 'nowrap',
                 }}
-                onClick={(e) => handleKeywordClick(e, key, value1, value2)} // Pass value to the click handler
+                //onClick={(e) => handleKeywordClick(e, key, value1, value2, value3)} // Directly play the keyword segment
+                onClick={(e) => loopKeywordPlay(e, key, value1, value2, value3)} // Loop play the keyword segment
               >
                 {key} {/* Display the key */}
               </div>
@@ -1826,18 +2452,19 @@ function convertToEmbedUrl(url: string): string | null {
             {/* Place the search box for video at the right-down of progress bar area */}  
             <div style={{position: 'fixed', transform:'translateX(41.5em)', bottom: '1px'}}>
               <input id="searchBox" 
-                     type="text"                      
-                     className='dynamic-searchBox' 
-                     placeholder="Type and Press Enter to Search a Video" 
-                     style={{display:"none"}}
-                     onFocus={() => { const searchBox = document.getElementById('searchBox');                                        
+                    type="text"                      
+                    className='dynamic-searchBox' 
+                    placeholder="Type and Press Enter to Search a Video" 
+                    style={{display:"none"}}
+                    onFocus={() => { const searchBox = document.getElementById('searchBox');                                        
                                       (searchBox as HTMLInputElement).value = ''; 
                                       (searchBox as HTMLInputElement).style.color = 'blue'; 
                                     }} 
-              /> {/*end of search box input*/}
+              /> 
             </div>  
           </div>
-          {/* Display the current play time */}
+
+          {/* Display the current play time and Total time */}
           <div
             style={{
               position: 'absolute',
@@ -1851,28 +2478,35 @@ function convertToEmbedUrl(url: string): string | null {
               fontSize: '0.9em',
             }}>
             {formatDuration({time: currentTime})}
-          </div>          
-          {/* Display the total duration */}
+          </div>                    
+          {/* total duration */}
           <div className="audio-duration">
             {formatDuration({time: totalDuration})}
           </div>          
-        </div>   
+        </div>  
+
+        {/* AI Button to display the Right panel to ask Question */}
         <div className="tooltip-container">
           <Button
-                label={'AI'}
+                label={'Chatbot'}
                 buttonStyle={'regular'}
+                disabled={!isConnected}
                 onClick={openChatbot}
               /> 
           <div className="tooltip">
-            <span>Open Chatbot to: Ask for question or Search a Video from youtube or Search in the Magzine</span><br />
+            <span><strong className='tooltip-title'>Open an AI Chatbot to: </strong><br/>Ask for general questions or Search a Video from youtube or Search in the Magzine</span><br />
           </div>             
-        </div>              
+        </div>
+        {/* Mute/Unmute Button to have a real time conversion */}                      
+        <button ref={muteBtnRef} onClick={toggleMuteRecording} className='hidden-button'></button>  
         <div className="tooltip-container">
           <Button
+              id="muteButton"
               label={isMuted ? '' : ''}
               iconPosition={'start'}
               icon={isMuted ? MicOff : Mic}
-              disabled={isMuteBtnDisabled}
+              //disabled={isMuteBtnDisabled}
+              disabled={!isConnected}
               buttonStyle={'regular'}
               onClick={toggleMuteRecording}
             />
@@ -1881,230 +2515,11 @@ function convertToEmbedUrl(url: string): string | null {
             {!isConnected && <>The <span className="highlightred">first</span> turning on will start the Audio Copilot.<br /><br /> </>}
             {isConnected && <><br /> </>}
           </div>            
-        </div>         
-        <div style={{ fontSize: '1em' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Connection error</span> occurred</> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div>
-        <div className="content-api-key-1">
-          {!LOCAL_RELAY_SERVER_URL && (
-            <Button
-              icon={Edit}
-              iconPosition="end"
-              buttonStyle="flush"
-              label={`\u00A0`}
-              title="Reset the OpenAI API Key"
-              onClick={() => resetAPIKey()}
-            />
-          )}
-        </div>        
+        </div>   
+        {/*Display Copilot Status*/}      
+        <div style={{ fontSize: '1em' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Error Occurred!</span></> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div>      
       </div>   
-      {/* Original content-main from openai-realtime-console is hidden */}
-      <div className="content-main">
-        <div className="content-logs">
-          <div className={isHidden ? 'content-block conversation-display' : 'content-block conversation'}>
-            <div className="content-block-title">
-              {isConnected ? (
-                <>
-                  Audio Copilot Status: <span className="highlightgreen">On</span>
-                </>
-              ) : (
-                <>
-                  Audio Copilot Status: <span className="highlightred">Off</span>
-                </>
-              )}
-            </div>
-            <div className="content-block-body" data-conversation-content>
-              {items.map((conversationItem, i) => {
-                return (
-                  <div className="conversation-item" key={conversationItem.id}>
-                    <div className={`speaker ${conversationItem.role || ''}`}>
-                      <div>
-                        {(
-                          conversationItem.role || conversationItem.type
-                        ).replaceAll('_', ' ')}
-                      </div>
-                      <div
-                        className="close"
-                        onClick={() =>
-                          deleteConversationItem(conversationItem.id)
-                        }
-                      >
-                        <X />
-                      </div>
-                    </div>
-                    <div className={`speaker-content`}>
-                      {/* tool response */}
-                      {conversationItem.type === 'function_call_output' && (
-                        <div>{conversationItem.formatted.output}</div>
-                      )}
-                      {/* tool call */}
-                      {!!conversationItem.formatted.tool && (
-                        <div>
-                          {conversationItem.formatted.tool.name}(
-                          {conversationItem.formatted.tool.arguments})
-                        </div>
-                      )}
-                      {!conversationItem.formatted.tool &&
-                        conversationItem.role === 'user' && (
-                          <div>
-                            {conversationItem.formatted.transcript ||
-                              (conversationItem.formatted.audio?.length
-                                ? '(awaiting transcript)'
-                                : conversationItem.formatted.text ||
-                                  '(item sent)')}
-                          </div>
-                        )}
-                      {!conversationItem.formatted.tool &&
-                        conversationItem.role === 'assistant' && (
-                          <div>
-                            {conversationItem.formatted.transcript ||
-                              conversationItem.formatted.text ||
-                              '(truncated)'}
-                          </div>
-                        )}
-                      {conversationItem.formatted.file && (
-                        <audio
-                          src={conversationItem.formatted.file.url}
-                          controls
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>                   
-          <div className="content-actions">
-          <Button
-              label={isHidden ? 'A/V' : 'V/A'}
-              buttonStyle={'regular'}
-              onClick={toggleVisibility}
-            />             
-          <div className='spacer' />            
-          <Button
-              label={isPlaying ? 'Pause' : 'Play\u00A0'}
-              iconPosition={'start'}
-              icon={isPlaying ? Pause : Play}
-              buttonStyle={'regular'}
-              onClick={
-                isPlaying ? toggleAudio : toggleAudio
-              }
-            />            
-            <div className='spacer' />
-            <div style={{ width: '63%', backgroundColor: '#ccc', height: '10px', borderRadius: '10px', marginTop: '10px', marginLeft: '-32px' }}>
-              <div
-                style={{
-                  width: `${progress}%`,
-                  backgroundColor: '#007bff',
-                  height: '10px',
-                  borderRadius: '10px',
-                }}
-              />
-            </div>
-            <div className="spacer" />            
-            <Toggle
-              defaultValue={false}
-              labels={['\u00A0', 'Audio Copilot']}
-              values={['none', 'server_vad']}
-              onChange={(_, value) => switchAudioCopilot(value)}
-            />
-            <Button
-                label={isMuted ? '' : ''}
-                iconPosition={'start'}
-                icon={isMuted ? MicOff : Mic}
-                disabled={!isConnected}
-                buttonStyle={'regular'}
-                onClick={
-                  isMuted ? toggleMuteRecording : toggleMuteRecording
-                }
-              />                       
-          </div>          
-          <div className="content-block events">
-            <div className="visualization">
-              <div className="visualization-entry client">
-                <canvas ref={clientCanvasRef} />
-              </div>
-              <div className="visualization-entry server">
-                <canvas ref={serverCanvasRef} />
-              </div>
-            </div>
-            <div className="network-title">Network Activities</div>
-            <div className="content-block-body" ref={eventsScrollRef}>
-              {!realtimeEvents.length && `Copilot awaiting turned on...`}
-              {realtimeEvents.map((realtimeEvent, i) => {
-                const count = realtimeEvent.count;
-                const event = { ...realtimeEvent.event };
-                if (event.type === 'input_audio_buffer.append') {
-                  event.audio = `[trimmed: ${event.audio.length} bytes]`;
-                } else if (event.type === 'response.audio.delta') {
-                  event.delta = `[trimmed: ${event.delta.length} bytes]`;
-                }
-                return (
-                  <div className="event" key={event.event_id}>
-                    <div className="event-timestamp">
-                      {formatTime(realtimeEvent.time)}
-                    </div>
-                    <div className="event-details">
-                      <div
-                        className="event-summary"
-                        onClick={() => {
-                          // toggle event details
-                          const id = event.event_id;
-                          const expanded = { ...expandedEvents };
-                          if (expanded[id]) {
-                            delete expanded[id];
-                          } else {
-                            expanded[id] = true;
-                          }
-                          setExpandedEvents(expanded);
-                        }}
-                      >
-                        <div
-                          className={`event-source ${
-                            event.type === 'error'
-                              ? 'error'
-                              : realtimeEvent.source
-                          }`}
-                        >
-                          {realtimeEvent.source === 'client' ? (
-                            <ArrowUp />
-                          ) : (
-                            <ArrowDown />
-                          )}
-                          <span>
-                            {event.type === 'error'
-                              ? 'error!'
-                              : realtimeEvent.source}
-                          </span>
-                        </div>
-                        <div className="event-type">
-                          {event.type}
-                          {count && ` (${count})`}
-                        </div>
-                      </div>
-                      {!!expandedEvents[event.event_id] && (
-                        <div className="event-payload">
-                          {JSON.stringify(event, null, 2)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>          
-        </div>
-        <div className="divider"></div>
-        <div className="content-right">
-          <div className="content-block map">
-            <div dangerouslySetInnerHTML={{ __html: additional_info }} />
-          </div>
-          <div className="content-block kv">
-            <div className="content-block-title">set_memory()</div>
-            <div className="content-block-body content-kv">
-              {JSON.stringify(memoryKv, null, 2)}
-            </div>
-          </div>
-        </div>
-      </div>
+
     </div>
   );
 }
