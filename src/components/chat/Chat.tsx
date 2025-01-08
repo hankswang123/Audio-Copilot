@@ -7,6 +7,7 @@ import { OpenAI } from "openai";
 import { AssistantStreamEvent } from "openai/resources/beta";
 import { RequiredActionFunctionToolCall } from "openai/resources/beta/threads/runs/runs";
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
+import { RealtimeClient } from '@openai/realtime-api-beta';
 
 import { Button } from '../button/Button';
 import { Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight } from 'react-feather';
@@ -54,7 +55,7 @@ if (apiKey === '') {
 //tbd: assistant creation when the existing assistant is not available
 //const assistantId = ""; // indicate the new assistant to not alter or transform HTML content when including <iframe>
 let assistantId = localStorage.getItem('tmp::asst_id');
-if (assistantId === '') {
+if (assistantId === null) {
   assistantId = prompt('Assistant Id needed');
   if (assistantId === null) {
     throw new Error('Assistant Id is required');
@@ -114,7 +115,7 @@ const AudioMessage = ({ itemId, items }: { itemId: string; items: ItemType[] }) 
     <div style={{ alignSelf }}>
       {items
         .filter((conversationItem) => conversationItem.id === itemId) // Filter for the specific item
-        .map((conversationItem) => (
+        .map((conversationItem) => (          
           <div className={`cv-item`} key={conversationItem.id}>            
             <div className={`speaker ${conversationItem.role || ''}`} style={{ display: 'none' }}>
               <div>
@@ -135,26 +136,29 @@ const AudioMessage = ({ itemId, items }: { itemId: string; items: ItemType[] }) 
               )}
               {!conversationItem.formatted.tool &&
                 conversationItem.role === 'user' && (
-                  <div style={{ alignSelf: 'flex-end', textAlign: 'right'}}>
+                  <div className={styles.userMessage} style={{ alignSelf: 'flex-end'}}>
                     {conversationItem.formatted.transcript ||
                       (conversationItem.formatted.audio?.length
                         ? '(awaiting transcript)'
                         : conversationItem.formatted.text || '(item sent)')}
+                    {/* Audio */}                    
                   </div>
                 )}
               {!conversationItem.formatted.tool &&
                 conversationItem.role === 'assistant' && (
-                  <div>
+                  <div className={styles.assistantMessage}>
                     {conversationItem.formatted.transcript ||
                       conversationItem.formatted.text || '(truncated)'}
+                    {/* Audio */}                                           
                   </div>
                 )}
+              {/* Audio */}
               {conversationItem.formatted.file && (() => {
-                console.log('Audio URL:', conversationItem.formatted.file.url);
-                return (
-                  <audio src={conversationItem.formatted.file.url} controls />
-                );
-              })()}
+                      console.log('Audio URL:', conversationItem.formatted.file.url);
+                      return (
+                        <audio src={conversationItem.formatted.file.url} controls />
+                      );
+                    })()}               
             </div>
           </div>
         ))}
@@ -196,10 +200,11 @@ type ChatProps = {
   functionCallHandler?: (
     toolCall: RequiredActionFunctionToolCall
   ) => Promise<string>;
+  realtimeClient?: RealtimeClient;
 };
 
 //export function Chat({ functionCallHandler = () => Promise.resolve("") }: ChatProps, ref) {
-const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve("") }: ChatProps, ref) => {
+const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), realtimeClient }: ChatProps, ref) => {
   const [userInput, setUserInput] = useState("");
   //new codes by copilot
   const [messages, setMessages] = useState<{ role: "user" | "assistant" | "code" | "audio" | "read_aloud"; text: string }[]>([]);
@@ -208,6 +213,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve("") }: Ch
   const threadIdRef = useRef<string | null>(null);
   const [items, setItems] = useState<ItemType[]>([]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [isChecked, setIsChecked] = useState(true);
 
   /* Load message from local storage or IDB
   useEffect(() => {
@@ -304,6 +310,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve("") }: Ch
       appendMessage("assistant", embedUrl);
     },  
     updateSelection(selection) {
+      //appendMessage("user", `<div style={fontSize: '0.2em',}>[Read Aloud]:</div><br />`+ selection);
       appendMessage("user", '[Read Aloud]:<br />'+ selection);
     },          
 
@@ -319,6 +326,37 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve("") }: Ch
     updateItemID(updateItemID) {
       appendMessage("audio", updateItemID);
     },    
+
+    explainSelection(userInput) {     
+      sendMessage(userInput);
+      setInputDisabled(true);
+    },    
+
+    chatFromExternal(userInput) {
+      if (!userInput.trim()) return;
+      if(isChecked) {
+      // use Realtime API to reply user input/question
+        if(realtimeClient.isConnected()){
+          realtimeClient.sendUserMessageContent([
+            {
+              type: `input_text`,
+              text: userInput,
+            },
+          ]);
+        }else{
+          appendMessage("assistant", "RealTime API Connection error. Please Connect again...");
+          setInputDisabled(false);
+        }
+      }else{
+      // use Assistant API to reply user input/question
+        setMessages((prev) => [...prev, { role: "user", text: userInput }]);
+        sendMessage(userInput);
+        //setUserInput("");
+        setInputDisabled(true);
+      }
+      setUserInput("");
+    },
+
   }));  
 
   useEffect(() => {
@@ -425,10 +463,27 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve("") }: Ch
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim()) return;
-    setMessages((prev) => [...prev, { role: "user", text: userInput }]);
-    sendMessage(userInput);
+    if(isChecked) {
+    // use Realtime API to reply user input/question
+      if(realtimeClient.isConnected()){
+        realtimeClient.sendUserMessageContent([
+          {
+            type: `input_text`,
+            text: userInput,
+          },
+        ]);
+      }else{
+        appendMessage("assistant", "RealTime API Connection error. Please Connect again...");
+        setInputDisabled(false);
+      }
+    }else{
+    // use Assistant API to reply user input/question
+      setMessages((prev) => [...prev, { role: "user", text: userInput }]);
+      sendMessage(userInput);
+      //setUserInput("");
+      setInputDisabled(true);
+    }
     setUserInput("");
-    setInputDisabled(true);
   };
 
   /* Stream Event Handlers */
@@ -542,6 +597,10 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve("") }: Ch
     
   }  
 
+  function handleCheckboxChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    setIsChecked(event.target.checked);
+  }
+
   return (
     <div className={styles.chatContainer}>
       <div className={styles.messages}>
@@ -581,8 +640,16 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve("") }: Ch
               disabled={inputDisabled}
               buttonStyle={'regular'}
               onFocus={() => {console.log('Mute/Unmute icon should not be displayed'); }}
+              style={{marginRight: '1px'}}
               //onClick={toggleMuteRecording}
-            />          
+            /> 
+        <input
+          type="checkbox"
+          title={isChecked ? "Real-time Voice Reply" : "Assistant Reply"}
+          checked={isChecked}
+          onChange={handleCheckboxChange}
+          //style={{position: 'absolute', top: '5%', left: '97%', transform: 'translate(-50%, -50%)', zIndex: 1}}
+        />
       </form>        
     </div>
   );

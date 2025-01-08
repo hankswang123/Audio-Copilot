@@ -25,6 +25,7 @@ export class WavStreamPlayer {
     this.newsVideo = null;
     this.isHidden = true;
     this.setIsPlaying = null;
+    this.repeatCurrent = null;
     this.itemStatus = null;
     this.askStop = false;
     this.gainNode = null;
@@ -43,7 +44,7 @@ export class WavStreamPlayer {
    * Connects the audio context and enables output to speakers
    * @returns {Promise<true>}
    */
-  async connect(newsAudio, newsVideo, setIsPlaying) {
+  async connect(newsAudio, newsVideo, setIsPlaying, repeatCurrent) {
     this.context = new AudioContext({ sampleRate: this.sampleRate });
     if (this.context.state === 'suspended') {
       await this.context.resume();
@@ -62,6 +63,7 @@ export class WavStreamPlayer {
     this.newsAudio = newsAudio;
     this.newsVideo = newsVideo;
     this.setIsPlaying = setIsPlaying;  
+    this.repeatCurrent = repeatCurrent;
     this.gainNode = this.context.createGain(); // Create gain node for volume control
     this.gainNode.connect(this.context.destination); // Connect gain to output    
     this.gainNode.gain.value = 0; // Set volume to -1: mute, 0: default, 1: max
@@ -123,6 +125,9 @@ export class WavStreamPlayer {
             //this.askStop = false;
           } else {
             this.newsAudio.play();
+            // Resume playing the audio from the start of the current caption
+            // bug: only start playing from the beginning of the whole audio
+            //this.repeatCurrent();
             this.setIsPlaying(true);            
           }
         }

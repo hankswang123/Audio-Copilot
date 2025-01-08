@@ -32,6 +32,7 @@
   width: 100%;
   padding: 6px;
   padding-bottom: 0px;  
+  border-radius: 16px;
   order: 1;
 }
 
@@ -94,7 +95,7 @@
 .codeMessage
 .audioMessage {
   margin: 8px 0;
-  padding: 8px 16px;
+  padding: 4px 8px;
   align-self: flex-start;
   border-radius: 15px;
   max-width: 80%;
@@ -185,6 +186,8 @@
   }
   .speaker-content {
     /*color: #18181b;*/
+    margin: 8px 0;
+    padding: 8px 16px;
     display: flex;
     overflow: hidden;
     word-wrap: break-word;

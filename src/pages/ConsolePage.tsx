@@ -11,27 +11,31 @@
 const LOCAL_RELAY_SERVER_URL: string =
   process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
 
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+// { instructions, tts_voice, realtime_voice, additional_info } from '../utils/conversation_config.js';  
+//import { audioCaptions, keywords, fetchKeywords, transformAudioScripts } from '../utils/scripts2captions.js';
+//import { pdfFilePath, audioFilePath } from '../filePaths.js'; // Import the file paths
+//import nodemailer from 'nodemailer';
+//import EventLog from "../components/webrtc/EventLog";
+//import { cp } from 'fs';
 
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { RealtimeClient } from '@openai/realtime-api-beta';
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
-import { instructions, additional_info } from '../utils/conversation_config.js';
 import { WavRenderer } from '../utils/wav_renderer';
 
-import { X, Zap, Edit, Play, Pause, Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight } from 'react-feather';
-import { Button } from '../components/button/Button';
+import {AlignCenter, Youtube, Key, Layout, Book, BookOpen, TrendingUp, X, Zap, Edit, Play, Pause, Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight, Settings, Repeat, SkipBack, UserPlus, ZoomOut, ZoomIn, User, Volume } from 'react-feather';
 
 import { Document, Page } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
-
 import './ConsolePage.scss';
-import { audioCaptions, keywords } from '../utils/scripts2captions.js';
-import { pdfFilePath, audioFilePath } from '../filePaths.js'; // Import the file paths
+import { magzines, fetchKeywords, transformAudioScripts, buildInstructions, tts_voice } from '../utils/app_util.js';
 import Chat, {openai} from '../components/chat/Chat';
 import PdfViewerWithIcons from '../components/pdf/PdfViewerWithIcons';
-//import nodemailer from 'nodemailer';
+import { Button } from '../components/button/Button';
+import SessionControls from "../components/webrtc/SessionControls";
+import { ModuleResolutionKind } from 'typescript';
 
 /**
  * Type for all event logs
@@ -121,8 +125,12 @@ export function ConsolePage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [captionWidth, setCaptionWidth] = useState(100);
   const [playbackRate, setPlaybackRate] = useState(1.0); // State to control playback speed
+  const [playbackVolume, setPlaybackVolume] = useState(0.75); // State to control playback speed
+  const [rtVoice, setRtVoice] = useState<'ash' | 'alloy' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse'>('alloy'); // State to control realtime voice speed
   const [keyword, setKeyword] = useState(''); // State to store keyword
+  //const [keyWordMode, setKeyWordMode] = useState(false); // keyword mode: loop keyword audio
   const [isHidden, setIsHidden] = useState(true); // State to control audio/video visibility
   const [isDragging, setIsDragging] = useState(false);
   const [isProgressDragging, setIsProgressDragging] = useState(false);
@@ -152,10 +160,91 @@ export function ConsolePage() {
   const pageRefs = useRef<React.RefObject<HTMLDivElement>[]>([]); // Array of refs for each page
   const [scale, setScale] = useState(1); // Zoom level
   const [renderedPages, setRenderedPages] = useState([1]); // Track pages rendered in the DOM
+  const [isTwoPageView, setIsTwoPageView] = useState(true); // Track two-page view mode
 
   const timeUpdateHandlerRef = useRef<(this: HTMLAudioElement, ev: Event) => any>();
   const endedHandlerRef = useRef<(this: HTMLAudioElement, ev: Event) => any>();
-  const [isLoop, setIsLoop] = useState(false);  
+  const [isLoop, setIsLoop] = useState(false);
+
+  const [pdfFilePath1, setpdfFilePath1] = useState(`./play/${magzines[0]}/${magzines[0]}.pdf`);
+  const [audioFilePath1, setaudioFilePath1] = useState(`./play/${magzines[0]}/${magzines[0]}.wav`);
+  
+  const [newAudioCaptions, setNewAudioCaptions] = useState([]);
+  const audioCaptions = useRef(newAudioCaptions);
+
+  const [newKeywords, setNewKeywords] = useState({});
+  const Keywords = useRef(newKeywords);  
+
+  const [newInstructions, setNewInstructions] = useState('');
+  const instructions = useRef(newInstructions);   
+
+  const [newMagzine, setNewMagzine] = useState(`${magzines[0].replace(/[_-]/g, " ")}`);
+
+  // Initialize the keywords with the first magazine
+  useEffect(() => {
+    const bInstructions = async () => {
+      const instructions = await buildInstructions();
+      setNewInstructions(instructions); 
+    };
+
+    bInstructions(); // Call the async function
+  }, []);     
+
+  useEffect(() => {
+    instructions.current = newInstructions; // Sync ref with the updated state
+  }, [newInstructions]);      
+
+  // Initialize the keywords with the first magazine
+  useEffect(() => {
+    const fetchNewKeywords = async () => {
+      const keywords = await fetchKeywords();
+      setNewKeywords(keywords); 
+    };
+
+    fetchNewKeywords(); // Call the async function
+  }, []);   
+
+  useEffect(() => {
+    Keywords.current = newKeywords; // Sync ref with the updated state
+  }, [newKeywords]);    
+
+  // Initialize the audio captions with the first magazine
+  useEffect(() => {
+    const fetchAudioCaptions = async () => {
+      const captions = await transformAudioScripts();
+      setNewAudioCaptions(captions); 
+    };
+
+    fetchAudioCaptions(); // Call the async function
+  }, []); 
+
+  useEffect(() => {
+    audioCaptions.current = newAudioCaptions; // Sync ref with the updated state
+  }, [newAudioCaptions]);  
+
+  // Update PDF file path, audio file path and audio captions when a new magzine is selected
+  const handleSelectChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newMagzine = event.target.value;
+
+    setNewMagzine(`${newMagzine.replace(/[_-]/g, " ")}`);
+
+    setpdfFilePath1(`./play/${newMagzine}/${newMagzine}.pdf`);
+    setaudioFilePath1(`./play/${newMagzine}/${newMagzine}.wav`);
+
+    audioRef.current.src = `./play/${newMagzine}/${newMagzine}.wav`;
+    audioRef.current.currentTime = 0;    
+    setProgress(0);
+    setCurrentTime(0);
+    if(isPlaying){toggleAudio();}
+    setNewAudioCaptions( await transformAudioScripts({magzine: newMagzine}) );
+    setNewKeywords( await fetchKeywords({magzine: newMagzine}) );
+
+    const newInstructions = await buildInstructions({magzine: newMagzine});
+    setNewInstructions( newInstructions );
+    const client = clientRef.current;
+    client.updateSession({ instructions: newInstructions });     
+
+  };  
 
   // Some times isConnected could not reflect the actual connection status due to the delay of the state update
   // To solve this issue, we use a ref to store the actual connection status
@@ -205,11 +294,87 @@ export function ConsolePage() {
     console.log(`Page ${pageNumber} loaded successfully.`);
 
     // Add the next page to the DOM
+    /* Previous Logic
     setRenderedPages((prev) => {
       const nextPage = Math.min(pageNumber + 1, numPages || 0);
       return prev.includes(nextPage) ? prev : [...prev, nextPage];
-    });    
+    });    */
+
+  // 在双页视图模式下，一次加载两页
+  setRenderedPages((prev) => {
+    const nextPages = [...prev];
+    
+    if (isTwoPageView) {
+      // 如果是第一页，加载第2页和第3页
+      if (pageNumber === 1) {
+        if (!prev.includes(2)) nextPages.push(2);
+        if (!prev.includes(3)) nextPages.push(3);
+      } else {
+        // 其他情况，加载后续两页
+        const nextPage1 = Math.min(pageNumber + 2, numPages || 0);
+        const nextPage2 = Math.min(pageNumber + 3, numPages || 0);
+        
+        if (!prev.includes(nextPage1)) nextPages.push(nextPage1);
+        if (!prev.includes(nextPage2)) nextPages.push(nextPage2);
+      }
+    } else {
+      // 单页视图模式
+      const nextPage = Math.min(pageNumber + 1, numPages || 0);
+      if (!prev.includes(nextPage)) nextPages.push(nextPage);
+    }
+    
+    return nextPages;
+  });  
   };
+
+  // 将页面分组为双页显示
+  const getPagePairs = (pages: number[]) => {
+    if (!isTwoPageView) {
+      return pages.map(page => [page]);
+    }
+
+    const pairs: number[][] = [];
+    // 第一页单独显示
+    if (pages.includes(1)) {
+      pairs.push([1]);
+      pages = pages.filter(p => p !== 1);
+    }
+    
+    // 其余页面两两分组
+    for (let i = 0; i < pages.length; i += 2) {
+      pairs.push([
+        pages[i],
+        i + 1 < pages.length ? pages[i + 1] : null
+      ].filter(Boolean) as number[]);
+    }
+    return pairs;
+  };  
+
+  // Handle zooming of the PDF when the user clicks the '+' button  
+  const togglePageView = () => {
+    setIsTwoPageView(!isTwoPageView);
+  };  
+
+  const openKeywordsFromKey = () => {
+    if(keyword === '') {
+
+      const openKeywords = document.getElementById('openKeywords');    
+      if(openKeywords){
+        openKeywords.click();
+      }      
+
+    }
+  }
+
+  const openKeywords = () => {
+    /*
+    closeRightPanel();
+
+    const rightArrow = document.getElementById('openRightArrow');
+    if(rightArrow){
+      rightArrow.style.display = 'flex';
+    }  */
+  }
 
   const closeRightArrowNew = () => {
     closeRightPanel();
@@ -223,7 +388,26 @@ export function ConsolePage() {
     if(closeRightArrow){
       closeRightArrow.style.display = 'none';
     }    
-  }
+
+    /*
+    const captionDisplay = document.getElementById('captionDisplay');
+    if(isCaptionVisible && captionDisplay){
+      captionDisplay.style.width = `100%`;
+    }   */ 
+
+    const captionDisplay = document.getElementById('captionDisplay');
+    const captionWidth = window.innerWidth - 51;
+    if(isCaptionVisible && captionDisplay){
+      captionDisplay.style.width = `${captionWidth}px`;
+    }    
+
+    /*
+    const openKeywords = document.getElementById('openKeywords');    
+    if(openKeywords){
+      openKeywords.click();
+    }*/
+
+  }  
 
   const closeRightPanel = () => {
     setIsCloseRightPanelDisabled(true);
@@ -306,6 +490,42 @@ export function ConsolePage() {
 
   };   
 
+  // Handle search videos from selection context menu
+  const selectionSearchVideos = async (input: string) => { 
+
+    chatRef.current.chatFromExternal(`Search video about ${input}`);    
+
+    /*
+    const client = clientRef.current;
+    if(client.isConnected()){
+        client.sendUserMessageContent([
+        {
+          type: `input_text`,
+          text: `Search video about ${input}`,
+        },
+      ]);  
+    }  */
+  }  
+
+  const selectionTalkAbout = async (input: string) => {
+    const client = clientRef.current;
+    if(client.isConnected()){
+        client.sendUserMessageContent([
+        {
+          type: `input_text`,
+          text: `Hello, I want to talk about ${input}`,
+        },
+      ]);  
+
+      if(!isMuteBtnDisabled && isMuted){
+        muteBtnRef.current.click();
+
+        hideContextMenu();
+        openChatbot();
+      }
+    }
+  }
+
   // Handle text are selected, show the popup to read aloud
   let readAloudBuffer = null; // Global buffer to store the read aloud audio
   const selectionTTS = async (input: string) => { 
@@ -315,35 +535,54 @@ export function ConsolePage() {
     }else{
       const pcm = await openai.audio.speech.create({
         model: "tts-1",
-        voice: "alloy",
+        voice: tts_voice,
         response_format: "pcm",
         speed: 1.0,
         input: input,
       });
       const pcmArrayBuffer = await pcm.arrayBuffer(); // Convert the response to an ArrayBuffer
-      const int16Pcm = new Int16Array(pcmArrayBuffer);
-      wavStreamPlayerRef.current.add16BitPCM(int16Pcm);
+      const readAloudPcm = new Int16Array(pcmArrayBuffer);
+      wavStreamPlayerRef.current.add16BitPCM(readAloudPcm);
 
+      // Insert the selection into the chat as user message
       chatRef.current.updateSelection(input);
 
+      // If selection is an English word or a phrase
+      // provide a definition and example sentences
+      if(input.length < 100) {
+        chatRef.current.explainSelection(`如果所选择的${input}是单个英文或者是一个词组，那么给出它的中文解释，并且提供两个英文例句，同时给出例句的翻译。如果是一个句子，那么直接给出它的翻译`);
+      }      
+
       const wavFile = await WavRecorder.decode(
-        int16Pcm,
+        readAloudPcm,
         24000,
         24000
       );    
+      // Insert the TTS audio into the chat as assistant message （show on the left side of the conversation panel）
       chatRef.current.updateReadAloud(wavFile.url);
 
-      readAloudBuffer = int16Pcm;
+      readAloudBuffer = readAloudPcm;
+
+      hideContextMenu();
+      openChatbot();
     }
   }
 
   // Test new connection to Realtime API by WebRTC
-  // Refer: https://platform.openai.com/docs/guides/realtime-webrtc
-  const test_webrtc = async () => {
-    // Get an ephemeral key from your server - see server code below
+  const getEphemeralKey = async () => {
     const tokenResponse = await fetch("http://localhost:3001/api/session");
     const data = await tokenResponse.json();
     const EPHEMERAL_KEY = data.client_secret.value;
+    return EPHEMERAL_KEY;    
+  }
+
+  // Refer: https://platform.openai.com/docs/guides/realtime-webrtc
+  const test_webrtc = async () => {
+    // Get an ephemeral key from your server - see server code below
+    //const tokenResponse = await fetch("http://localhost:3001/api/session");
+    //const data = await tokenResponse.json();
+    //const EPHEMERAL_KEY = data.client_secret.value;
+    const EPHEMERAL_KEY = await getEphemeralKey();
   
     // Create a peer connection
     const pc = new RTCPeerConnection();
@@ -388,17 +627,128 @@ export function ConsolePage() {
     };
     await pc.setRemoteDescription(answer as RTCSessionDescriptionInit);
 
-    // JSON, and sending it over the data channel
-    /*
-    const responseCreate = {
-      type: "response.create",
-      response: {
-        modalities: ["text"],
-        instructions: "Write a haiku about code",
+  } 
+
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [events, setEvents] = useState([]);
+  const [dataChannel, setDataChannel] = useState(null);
+  const peerConnection = useRef(null);
+  const audioElement = useRef(null);
+
+  async function startSession() {
+    // Get an ephemeral key from the Fastify server
+    //const tokenResponse = await fetch("/token");
+    const tokenResponse = await fetch("http://localhost:3001/api/session");
+    const data = await tokenResponse.json();
+    const EPHEMERAL_KEY = data.client_secret.value;
+
+    // Create a peer connection
+    const pc = new RTCPeerConnection();
+
+    // Set up to play remote audio from the model
+    audioElement.current = document.createElement("audio");
+    audioElement.current.autoplay = true;
+    pc.ontrack = (e) => (audioElement.current.srcObject = e.streams[0]);
+
+    // Add local audio track for microphone input in the browser
+    const ms = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+    });
+    pc.addTrack(ms.getTracks()[0]);
+
+    // Set up data channel for sending and receiving events
+    const dc = pc.createDataChannel("oai-events");
+    setDataChannel(dc);
+
+    // Start the session using the Session Description Protocol (SDP)
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    const baseUrl = "https://api.openai.com/v1/realtime";
+    //const model = "gpt-4o-realtime-preview-2024-12-17";
+    const model = "gpt-4o-mini-realtime-preview-2024-12-17";
+    const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
+      method: "POST",
+      body: offer.sdp,
+      headers: {
+        Authorization: `Bearer ${EPHEMERAL_KEY}`,
+        "Content-Type": "application/sdp",
+      },
+    });
+
+    const answer = {
+      type: "answer",
+      sdp: await sdpResponse.text(),
+    };
+    await pc.setRemoteDescription(answer as RTCSessionDescriptionInit);
+
+    peerConnection.current = pc;
+  }
+
+  // Stop current session, clean up peer connection and data channel
+  function stopSession() {
+    if (dataChannel) {
+      dataChannel.close();
+    }
+    if (peerConnection.current) {
+      peerConnection.current.close();
+    }
+
+    setIsSessionActive(false);
+    setDataChannel(null);
+    peerConnection.current = null;
+  }
+
+  // Send a message to the model
+  function sendClientEvent(message) {
+    if (dataChannel) {
+      message.event_id = message.event_id || crypto.randomUUID();
+      dataChannel.send(JSON.stringify(message));
+      setEvents((prev) => [message, ...prev]);
+    } else {
+      console.error(
+        "Failed to send message - no data channel available",
+        message,
+      );
+    }
+  }
+
+  // Send a text message to the model
+  function sendTextMessage(message) {
+    const event = {
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: message,
+          },
+        ],
       },
     };
-    dc.send(JSON.stringify(responseCreate));     */
-  }  
+
+    sendClientEvent(event);
+    sendClientEvent({ type: "response.create" });
+  }
+
+  // Attach event listeners to the data channel when a new one is created
+  useEffect(() => {
+    if (dataChannel) {
+      // Append new server events to the list
+      dataChannel.addEventListener("message", (e) => {
+        setEvents((prev) => [JSON.parse(e.data), ...prev]);
+      });
+
+      // Set session active when the data channel is opened
+      dataChannel.addEventListener("open", () => {
+        setIsSessionActive(true);
+        setEvents([]);
+      });
+    }
+  }, [dataChannel]);  
+// Test new connection to Realtime API by WebRTC  
 
   // Try to prevent zoom in/out event for the whole page
   // Status: logic not work yet
@@ -490,7 +840,9 @@ export function ConsolePage() {
 
   // Load the audio file when the component mounts
   useEffect(() => {
-    audioRef.current = new Audio(audioFilePath);
+    //audioRef.current = new Audio(audioFilePath);
+    //audioRef.current = new Audio(getAudioFilePath());
+    audioRef.current = new Audio(audioFilePath1);
 
     //audioRef.current = new Audio('./audio/ngl_issue23_uk.wav');
     //videoRef.current = new Video('./video/ck_interview.mp4');
@@ -508,9 +860,44 @@ export function ConsolePage() {
     }
   }, [playbackRate]); 
 
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = playbackVolume; // Set the playback speed
+    }
+  }, [playbackVolume]);   
+
   const toggleCaptionVisibility = () => {
     setIsCaptionVisible(!isCaptionVisible);
+
+    // Adjust the caption display width based on the right panel width
+    const rightPanel = rightRef.current;
+    if(rightPanel){
+      const computedStyle = getComputedStyle(rightPanel);
+      const rightPanelWidth = computedStyle.width;      
+
+      const newCloseRightArrowRight = parseInt(rightPanelWidth, 10) + 15;
+      //const captionWidth = window.innerWidth - newCloseRightArrowRight - 15;
+      const captionWidth = window.innerWidth - newCloseRightArrowRight - 38;
+
+      if( rightRef.current.style.display === 'none'){
+        //setCaptionWidth(100);
+        setCaptionWidth(96);      
+      }else{
+        setCaptionWidth((captionWidth / window.innerWidth) * 100);
+      }
+    } 
   };     
+
+  const btnClickFromCM = async () => {
+    const menuInput = document.getElementById('menuInput') as HTMLInputElement | null;
+    if(menuInput && menuInput.value.trim()){ 
+      chatRef.current.chatFromExternal(menuInput.value.trim());
+      menuInput.value = '';
+
+      hideContextMenu();
+      openChatbot();
+    }
+  }
 
   const adjustCaptionFontSize = (adjustment: number) => { 
     const captionDisplay = document.getElementById('captionDisplay');
@@ -544,6 +931,32 @@ export function ConsolePage() {
     setPlaybackRate(speed);
     console.log(`Speed set to ${speed}`);
   };  
+
+  const handleClearKeyword = (event: SpeedControlClickEvent): void => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the progress bar
+
+    setKeyword('');
+    // Remove any existing event listeners to prevent multiple registrations
+    if (timeUpdateHandlerRef.current) {
+      audioRef.current.removeEventListener('timeupdate', timeUpdateHandlerRef.current);
+    }
+    if (endedHandlerRef.current) {
+      audioRef.current.removeEventListener('ended', endedHandlerRef.current);
+    }
+
+    const closeKeywords = document.getElementById('closeKeywords');
+    if(closeKeywords){
+      closeKeywords.click();
+    }   
+
+  };     
+
+  const handleVolumeControlClick = (event: SpeedControlClickEvent, volume: number): void => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the progress bar
+
+    setPlaybackVolume(volume);
+    console.log(`Speed set to ${volume}`);
+  };    
   
   const handleLoopClick = (event: SpeedControlClickEvent): void => {
     event.stopPropagation(); // Prevent the event from bubbling up to the progress bar
@@ -584,9 +997,30 @@ export function ConsolePage() {
     };
   };  
 
-  const loopKeywordPlay = (event: SpeedControlClickEvent, keyword: string, currentTime: number, endTime: number, page: number) => {
+  const loopKeywordPlay = (event: React.MouseEvent, key: string, currentTime: number, endTime: number, page: number) => {
 
-    setKeyword(keyword);
+    const splitter = document.getElementById('splitter');
+    const closeKeywords = document.getElementById('closeKeywords');
+    if ( splitter.style.display === 'flex' ){
+      closeKeywords.click();
+    }
+
+    //setKeyword(key);
+
+    if(key === keyword){
+      setKeyword('');
+      // Remove any existing event listeners to prevent multiple registrations
+      if (timeUpdateHandlerRef.current) {
+        audioRef.current.removeEventListener('timeupdate', timeUpdateHandlerRef.current);
+      }
+      if (endedHandlerRef.current) {
+        audioRef.current.removeEventListener('ended', endedHandlerRef.current);
+      }
+      return;
+    }else{
+      setKeyword(key);
+    }
+
     if (audioRef.current) {
 
       // Remove any existing event listeners to prevent multiple registrations
@@ -600,7 +1034,8 @@ export function ConsolePage() {
       goToPage({ pageNumber: page });
       const pdfViewer = document.getElementById("pdfFile");
       if (pdfViewer) {
-        (pdfViewer as HTMLObjectElement).data = pdfFilePath + `?t=` + (new Date()).getTime() + `#page=` + page;//&t=${new Date().getTime()}
+        //(pdfViewer as HTMLObjectElement).data = pdfFilePath + `?t=` + (new Date()).getTime() + `#page=` + page;//&t=${new Date().getTime()}
+        (pdfViewer as HTMLObjectElement).data = pdfFilePath1 + `?t=` + (new Date()).getTime() + `#page=` + page;//&t=${new Date().getTime()}
         console.log((pdfViewer as HTMLObjectElement).data);
       }          
 
@@ -662,8 +1097,8 @@ export function ConsolePage() {
         // Clean up event listeners when the audio is paused or stopped
         audioRef.current.onpause = () => {
           if (audioRef.current) {
-            audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-            audioRef.current.removeEventListener('ended', handleEnded);
+            //audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+            //audioRef.current.removeEventListener('ended', handleEnded);
             console.log('event listeners removed');
           }
         };
@@ -682,11 +1117,41 @@ export function ConsolePage() {
       goToPage({ pageNumber: page });
       const pdfViewer = document.getElementById("pdfFile");
       if (pdfViewer) {
-        (pdfViewer as HTMLObjectElement).data = pdfFilePath + `?t=` + (new Date()).getTime() + `#page=` + page;//&t=${new Date().getTime()}
+        //(pdfViewer as HTMLObjectElement).data = pdfFilePath + `?t=` + (new Date()).getTime() + `#page=` + page;//&t=${new Date().getTime()}
+        (pdfViewer as HTMLObjectElement).data = pdfFilePath1 + `?t=` + (new Date()).getTime() + `#page=` + page;//&t=${new Date().getTime()}
         console.log((pdfViewer as HTMLObjectElement).data);
       }
     }
   };    
+
+  const repeatPrevious = () => {
+
+    const currentCaptionIndex = audioCaptions.current.findIndex((caption, index) => {
+      const nextCaption = audioCaptions.current[index + 1];
+      return currentTime >= caption.time && (!nextCaption || currentTime < nextCaption.time);
+    });      
+
+    if(currentCaptionIndex > 0){
+      const previousCaption = audioCaptions.current[currentCaptionIndex - 1];
+      audioRef.current.currentTime = previousCaption.time;      
+    }   
+  }  
+
+  const repeatCurrent = () => {
+
+    const currentCaptionIndex = audioCaptions.current.findIndex((caption, index) => {
+      const nextCaption = audioCaptions.current[index + 1];
+      return currentTime >= caption.time && (!nextCaption || currentTime < nextCaption.time);
+    });      
+
+    const currentCaption = audioCaptions.current[currentCaptionIndex];
+    audioRef.current.currentTime = currentCaption.time;      
+
+    if (!isPlaying && playPauseBtnRef.current) {
+      playPauseBtnRef.current.click(); // Trigger the button click event
+    }    
+
+  }  
 
   //Update the progress bar and current time when the audio is playing
   useEffect(() => {
@@ -696,7 +1161,7 @@ export function ConsolePage() {
     const updateProgress = () => {
       if (audio.duration) {
         setProgress((audio.currentTime / audio.duration) * 100);
-        setCurrentTime(audio.currentTime);
+        setCurrentTime(audio.currentTime);     
       }
     };
 
@@ -720,24 +1185,24 @@ export function ConsolePage() {
       const wordDuration = duration / words.length; // Evenly distribute word timing
 
       return words.map((word, index) => ({
-      word,
-      startTime: caption.time + index * wordDuration,
-      endTime: caption.time + (index + 1) * wordDuration,
-      }));
-    };
-    
+                        word,
+                        startTime: caption.time + index * wordDuration,
+                        endTime: caption.time + (index + 1) * wordDuration,
+                      }));
+    };    
+
     const updateCaption = () => {
       const currentTime = audio.currentTime;
 
       // Find the current caption
-      const currentCaptionIndex = audioCaptions.findIndex((caption, index) => {
-        const nextCaption = audioCaptions[index + 1];
+      const currentCaptionIndex = audioCaptions.current.findIndex((caption, index) => {
+        const nextCaption = audioCaptions.current[index + 1];
         return currentTime >= caption.time && (!nextCaption || currentTime < nextCaption.time);
       });
     
       if (currentCaptionIndex !== -1) {
-        const currentCaption = audioCaptions[currentCaptionIndex];
-        const nextCaption = audioCaptions[currentCaptionIndex + 1];
+        const currentCaption = audioCaptions.current[currentCaptionIndex];
+        const nextCaption = audioCaptions.current[currentCaptionIndex + 1];
         const wordsWithTiming = splitCaptionIntoWords(currentCaption, nextCaption?.time);
     
         // Find the active word
@@ -777,10 +1242,12 @@ export function ConsolePage() {
     };
   }, []);  
 
-  const handleSplitterMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleSplitterMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {    
     setIsDragging(true);
     setIsSplitterDragging(true);
-    resizePanel(e.nativeEvent);       
+    resizePanel(e.nativeEvent);      
+    document.body.style.userSelect = 'none'; // Prevent text selection
+    //document.body.classList.add('no-select'); // Add no-select class to prevent text selection
   };  
 
   const resizePanel = (e: MouseEvent | React.MouseEvent<HTMLDivElement>) => {
@@ -798,7 +1265,30 @@ export function ConsolePage() {
       closeRightArrow.style.right = `${newCloseRightArrowRight}px`;
     }      
 
+    const captionDisplay = document.getElementById('captionDisplay');
+    //const captionWidth = window.innerWidth - newrightWidth - 30;
+    const captionWidth = window.innerWidth - newrightWidth - 53;
+    if(isCaptionVisible && captionDisplay){
+      captionDisplay.style.width = `${captionWidth}px`;
+    }
+
   };  
+
+  /*
+  const handleMouseClick = (event: MouseEvent) => {
+
+    const menu = document.getElementById("contextMenu");
+    if (!menu.contains(event.target as Node)) {
+      hideContextMenu();
+    }   
+  };  
+
+  useEffect(() => {
+    document.addEventListener('click', handleMouseClick);
+    return () => {
+      document.removeEventListener('click', handleMouseClick);
+    };
+  }, []);    */
 
   useEffect(() => {
     document.addEventListener('mousemove', handleMouseMove);
@@ -847,7 +1337,13 @@ export function ConsolePage() {
     setIsProgressDragging(false);
     setIsSplitterDragging(false);
 
+    document.body.style.userSelect = 'auto'; // Restore text selection
+    //document.body.classList.remove('no-select'); // Remove no-select class after dragging
+
     const selectedText = window.getSelection().toString().trim();
+
+    //Max length supported by OpenAI API is 4096 for TTS model
+    if(selectedText.length >= 4096){ return; }
   
     // If no text is selected, remove the popup    
     if (!selectedText) {
@@ -856,25 +1352,54 @@ export function ConsolePage() {
         currentPopup = null;
         clearTimeout(popupTimeout);
       }
+
+      const menu = document.getElementById("contextMenu");
+      if (!menu.contains(e.target as Node)) {
+        hideContextMenu();
+      }      
+
+      /*
+      const menuInput = document.getElementById('menuInput');
+      if (e.target !== menuInput ) {
+        hideContextMenu(); // Hide the context menu
+      }*/
       return; // Exit early since no action is needed
     }
 
     if (selectedText && isConnectedRef.current) {
-      showPopup(e.clientX, e.clientY, selectedText);
+      //Read Aloud popup is replaced by the context menu
+      //showPopup(e.clientX, e.clientY, selectedText);
+
+      const selection = window.getSelection();
+      //prompt(selection.toString());
+      //const selrange = selection.getRangeAt(0);      
+      //prompt(selrange.toString());      
+      const range = selection.getRangeAt(0).getBoundingClientRect();
+      const x = range.left + window.scrollX;
+      const y = range.top + window.scrollY + 30;
+      
+      const readAloudLi = document.getElementById('readAloudLi');
+      readAloudLi.onclick = () => selectionTTS(selectedText);
+
+      const searchVideosLi = document.getElementById('searchVideosLi');
+      searchVideosLi.onclick = () => {chatRef.current.chatFromExternal(`Search videos about '${selectedText}'`);};
+
+      const talkAboutSelection = document.getElementById('talkAboutSelection');
+      talkAboutSelection.onclick = () => selectionTalkAbout(selectedText);
+      showContextMenu(x, y);                   
     }   
 
   };
 
   let popupTimeout = null; // Global timeout variable to track dismissal
   let currentPopup = null; // To keep track of the current popup  
-
   const showPopup = (x, y, text) => {
-  // Clear previous popup and timeout if it exists
-  if (currentPopup) {
-    currentPopup.remove();
-    clearTimeout(popupTimeout);
-    readAloudBuffer = null; // Clear the buffer
-  }
+    // Clear previous popup and timeout if it exists
+    if (currentPopup) {
+      currentPopup.remove();
+      clearTimeout(popupTimeout);
+      readAloudBuffer = null; // Clear the buffer
+    }
 
     const popup = document.createElement('div');
     popup.id = 'readAloudPopup';
@@ -888,6 +1413,7 @@ export function ConsolePage() {
     popup.style.borderRadius = '4px';
     popup.style.padding = '5px';
     popup.style.cursor = 'pointer';
+    popup.style.zIndex = '2001';
     popup.onclick = () => selectionTTS(text);
   
   // Attach mouse leave event to manage timeout
@@ -907,7 +1433,7 @@ export function ConsolePage() {
     document.body.appendChild(popup);
     currentPopup = popup;
     readAloudBuffer = null; // Clear the buffer
-  }
+  };
 
   const updateProgress = (e: MouseEvent | React.MouseEvent<HTMLDivElement>) => {
       const progressBar = progressBarRef.current;
@@ -952,6 +1478,10 @@ export function ConsolePage() {
     const videoFrame = document.getElementById('videoFrame');  
     const searchBox = document.getElementById('searchBox');  
 
+    const closeKeywords = document.getElementById('closeKeywords');
+    const floatingKeywords = document.getElementById('floatingKeywords');
+    const openKeywords = document.getElementById('openKeywords');
+
     if( closeButton && popupOverlay && videoFrame && searchBox) { 
     // Close the popup and stop the video
       closeButton.addEventListener('click', () => {
@@ -961,6 +1491,19 @@ export function ConsolePage() {
         (searchBox as HTMLInputElement).value = ''; // Clear the search box
       });
     }    
+
+    if( closeKeywords && floatingKeywords && openKeywords) { 
+      // Close the popup and stop the video
+      closeKeywords.addEventListener('click', () => {
+        floatingKeywords.style.display = 'none';
+        openKeywords.style.display = 'flex';
+        });
+
+        openKeywords.addEventListener('click', () => {
+          floatingKeywords.style.display = 'block';
+          openKeywords.style.display = 'none';
+          });        
+      }      
 
     return () => {
       //closeButton.removeEventListener('mouseup', handleMouseUp);
@@ -973,11 +1516,13 @@ export function ConsolePage() {
     const handleKeyDown = (e: KeyboardEvent) => {
 
       const searchBox = document.getElementById('searchBox');        
-      const chatInputBox = document.getElementById('chatInputBox');    
+      const chatInputBox = document.getElementById('chatInputBox'); 
+      const menuInput = document.getElementById('menuInput');   
+      const webRTCMessage = document.getElementById('webRTCMessage');    
       
       if (e.code === 'Space') {
         //if (e.target !== searchBox || e.target !== chatInputBox) {
-          if (e.target !== chatInputBox) {
+          if (e.target !== chatInputBox && e.target !== webRTCMessage && e.target !== menuInput) {
           e.preventDefault(); // Prevent default space bar action (scrolling)
           if (playPauseBtnRef.current) {
             playPauseBtnRef.current.click(); // Trigger the button click event
@@ -1128,7 +1673,7 @@ export function ConsolePage() {
           
           if (embedUrl) {
             // Assistant message of Chat will render the youtube video in iframe
-            return `<iframe width="100%" height="68%" src="${embedUrl}" style={{ borderRadius: '9px'}} allowfullscreen></iframe>`;
+            return `<iframe width="100%" height="60%" src="${embedUrl}" style={{ borderRadius: '9px'}} allowfullscreen></iframe></div><div><iframe width="100%" height="60%" src="${embedUrl}" style={{ borderRadius: '9px'}} allowfullscreen></iframe>`;
           } else {
             return 'Failed to convert to embeddable URL.';
           }
@@ -1177,12 +1722,30 @@ export function ConsolePage() {
             clearTimerforSearchBox(query);
             (searchBox as HTMLInputElement).style.color = 'blue'; // Reset the color
 
-            //insert the video searched into the conversation list
-            chatRef.current.updateVideo(`<iframe width="100%" height="68%" src="${embedUrl}" style={{ borderRadius: '9px'}} allowfullscreen></iframe>`);
-            //return `<iframe width="100%" height="68%" src="${embedUrl}" style={{ borderRadius: '9px'}} allowfullscreen></iframe>`;
+            // Insert the video searched into the conversation list at the same time
+            chatRef.current.updateVideo(`<iframe width="100%" height="95%" src="${embedUrl}" style={{ borderRadius: '9px'}} allowfullscreen></iframe>`);
+
+            if(results.length > 1){
+              const secondResult = results[1];            
+              // Convert to embeddable URL
+              const secondembedUrl = convertToEmbedUrl(secondResult.url);           
+              if (secondembedUrl) {
+                chatRef.current.updateVideo(`<iframe width="100%" height="95%" src="${secondembedUrl}" style={{ borderRadius: '9px'}} allowfullscreen></iframe>`);
+              } 
+            }
+
+            /*
+            if(results.length > 2){
+              const thirdResult = results[2];            
+              // Convert to embeddable URL
+              const thirdembedUrl = convertToEmbedUrl(thirdResult.url);           
+              if (thirdResult) {
+                chatRef.current.updateVideo(`<iframe width="100%" height="95%" src="${thirdembedUrl}" style={{ borderRadius: '9px'}} allowfullscreen></iframe>`);
+              }             
+            }      */  
+
           }
         } else {
-          //clearTimerforSearchBox('Failed to convert to embeddable URL.');
           clearTimerforSearchBox('Error occurred during video search.');
           console.log('Failed to convert to embeddable URL.');
         }
@@ -1248,6 +1811,26 @@ export function ConsolePage() {
 
       const newCloseRightArrowRight = parseInt(rightPanelWidth, 10) + 15;
       closeRightArrow.style.right = `${newCloseRightArrowRight}px`;
+
+      const captionDisplay = document.getElementById('captionDisplay');
+      //const captionWidth = window.innerWidth - newCloseRightArrowRight - 15;
+      const captionWidth = window.innerWidth - newCloseRightArrowRight - 38;
+      if(isCaptionVisible && captionDisplay){
+        captionDisplay.style.width = `${captionWidth}px`;
+      }      
+
+      /*
+      const floatingKeywords = document.getElementById('floatingKeywords');
+      if(floatingKeywords){
+        floatingKeywords.style.left = `0px`;
+        floatingKeywords.style.opacity = `0.5`;
+      }*/
+
+      const closeKeywords = document.getElementById('closeKeywords');
+      if(closeKeywords){
+        closeKeywords.click();
+      }
+
     }        
 
   }
@@ -1317,15 +1900,16 @@ export function ConsolePage() {
 
       const wavRecorder = wavRecorderRef.current;      
       await wavRecorder.record((data) => client.appendInputAudio(data.mono));
-      //for test, to trigger start of conversation
-      /*      
+      //for test, to trigger start of conversation      
+      /*
       client.sendUserMessageContent([
         {
           type: `input_text`,
-          text: `Hello!`,
-          // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+          text: `Hello!,I have a question`,
+          //text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+          //text: `Search a video about zebras`,
         },
-      ]);     */
+      ]);*/
     } else {
       setIsMuteBtnDisabled(true);
       switchAudioCopilot('server_vad');
@@ -1367,8 +1951,8 @@ export function ConsolePage() {
      */
   const switchAudioCopilotOn = useCallback(async () => {
     const client = clientRef.current;
-    const wavRecorder = wavRecorderRef.current;
-    const wavStreamPlayer = wavStreamPlayerRef.current;
+    //const wavRecorder = wavRecorderRef.current;
+    //const wavStreamPlayer = wavStreamPlayerRef.current;
 
     // Set state variables
     startTimeRef.current = new Date().toISOString();
@@ -1392,18 +1976,21 @@ export function ConsolePage() {
       } else if (apiKey !== '') {
         localStorage.setItem('tmp::voice_api_key', apiKey);
 
+        // Update the latest instructions if new magzine is loaded
+        client.updateSession({ instructions: instructions.current }); 
+
         client.realtime.apiKey = apiKey;        
         //await client.connect();        
         /*  To use the latest model: 'gpt-4o-realtime-preview-2024-12-17' 
                                   or 'gpt-4o-mini-realtime-preview-2024-12-17'
             with lower cost, call the inside logic of client.connect() directly */
-        //And also avoid touching codes of RealtimeClient.connect() and RealtimeAPI.connect()
+        //And also avoid touching codes of RealtimeClient.connect() and RealtimeAPI.connect()        
         if (client.isConnected()) {
           throw new Error(`Already connected, use .disconnect() first`);
         }
         //await client.realtime.connect({ model: 'gpt-4o-realtime-preview-2024-12-17' });
         await client.realtime.connect({ model: 'gpt-4o-mini-realtime-preview-2024-12-17' });
-        client.updateSession();      
+        client.updateSession();            
         /* End of inside logic client.connect() */
 
       } else {
@@ -1469,10 +2056,9 @@ export function ConsolePage() {
   }
 //captureAudioToPCM16();
 
-//hanks
   /**
    * Utility for formatting the timing of logs
-   */
+
   const formatTime = useCallback((timestamp: string) => {
     const startTime = startTimeRef.current;
     const t0 = new Date(startTime).valueOf();
@@ -1489,7 +2075,7 @@ export function ConsolePage() {
       return s;
     };
     return `${pad(m)}:${pad(s)}.${pad(hs)}`;
-  }, []);
+  }, []);*/
 
   /**
    * When you click the API key
@@ -1606,6 +2192,17 @@ export function ConsolePage() {
     };
   }, []);
 
+  interface VoiceControlClickEvent extends React.MouseEvent<HTMLDivElement> {
+    stopPropagation: () => void;
+  }
+
+  const handleVoiceControlClick = (event: VoiceControlClickEvent, voice: 'ash' | 'alloy' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse'): void => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the progress bar
+
+    setRtVoice(voice);
+    console.log(`Speed set to ${voice}`);
+  };    
+
   /**
    * Core RealtimeClient and audio capture setup
    * Set all of our instructions, tools, events and more
@@ -1615,8 +2212,13 @@ export function ConsolePage() {
     const wavStreamPlayer = wavStreamPlayerRef.current;
     const client = clientRef.current;
 
-    // Set instructions
-    client.updateSession({ instructions: instructions });
+    // Set the modalities - To disable audio, set this to ['text'] only
+    // !!! Set modalities as following will lead to other setting not working, e.g. voice, function calling
+    //client.updateSession({ modalities: ['text', 'voice'] });
+    // Set the voice type
+    client.updateSession({ voice: rtVoice });
+    // Set instructions->to be set when a new magazine is loaded or default instructions set before connecting
+    //client.updateSession({ instructions: instructions });
     // Set transcription, otherwise we don't get user transcriptions back
     client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
 
@@ -1654,7 +2256,7 @@ export function ConsolePage() {
         return { ok: true };
       }
     );
-    // hanks - Capabilities of Aduio Copilot
+    // Search news from google
     client.addTool(
       { //Capabilities demo: when a listener wants to ask for a google search
         name: 'google_search',
@@ -1675,9 +2277,9 @@ export function ConsolePage() {
         return await performGoogleSearch(query);
       }
     );    
-    // hanks - Capabilities of Aduio Copilot
+    // Search a video from Youtube 
     client.addTool(
-      { //Capabilities demo: when a listener wants to ask for a google search
+      { 
         name: 'youtube_search',
         description:
           'Performs a Youtube video search and returns the top 1 results.',
@@ -1694,6 +2296,8 @@ export function ConsolePage() {
       },
       async({ query }: { query: string }) => {
 
+        // To show the loading animation in the search box when searching for the video
+        // Clear the search box and show the loading animation
         const searchBox = document.getElementById('searchBox');  
         if (searchBox) {
           (searchBox as HTMLInputElement).value = query; // Clear the search box
@@ -1709,43 +2313,9 @@ export function ConsolePage() {
         }        
 
         await showVideofromYoutube(query);
-
       }
     );        
-    client.addTool(
-      { //Capabilities demo: to retrieve the latest stock for a given company
-        //e.g. get_stock_price(company: 'SAP') when valuation of SAP is heard, 
-        //user is just a tiny SAP stock holder and want to check the latest SAP stock prcie 
-        name: 'get_stock_price',
-        description:
-          'Retrieves the latest stock price for a given comppany. ',
-        parameters: {
-          type: 'object',
-          properties: {
-            company: {
-              type: 'string',
-              description: 'Name of the company',
-            },
-          },
-          required: ['company'],
-        },
-      },
-      async ({ company }: { [key: string]: any }) => {
-        /*
-        const result = await fetch(
-          `https://api.openai.com/v1/stock_price?company=${company}`
-        );*/
-        const result = {
-          ok: true,
-          date: '2024-10-25',
-          company: 'SAP',
-          price: 237.69,
-          currency: 'USD',
-        };
-        //const json = await result.json();
-        return result;
-      }
-    );
+    // Voice control the on-going playback
     client.addTool(
       { //Voice commands to control the on-going playback, e,g. pause, resume, speed up, speed down, 
         //skip forward, skip backward, volume up, volume down, peek the current time of the audio
@@ -1815,6 +2385,7 @@ export function ConsolePage() {
         return { ok: true };
       }
     );        
+    // Translation of the current sentence
     client.addTool(
       { //Jury's feedback: What if it could interpret what Copilot hear into local language in realtime? 
         //e.g. Copilot hears English, and translate it into Chinese in realtime
@@ -1845,6 +2416,7 @@ export function ConsolePage() {
         
       }
     );    
+    // Dive in the content by the keyword
     client.addTool(
       { //When a listener wants to learn or explore the content of the audio by the keyword
         name: 'learn_by_keyword',
@@ -1861,14 +2433,15 @@ export function ConsolePage() {
         },
       },
       async ({ keyword }: { [key: string]: any }) => {       
-        if( keyword in keywords) {
-          const range = keywords[keyword as keyof typeof keywords];
+        if( keyword in Keywords.current) {
+          const range = Keywords.current[keyword as keyof typeof Keywords.current];
           return [range[0], range[1]];
         } else {
           return { ok: false, info: 'No such a keyword' };
         }
       }
     );        
+    // Collecting Feedback
     client.addTool(
       { //Capabilities demo: when a lister wants to provide feedback
         //or similarly, sharing it to a friend...
@@ -1894,6 +2467,42 @@ export function ConsolePage() {
         return { ok: true, info: 'Thanks for your feedback' };
       }
     );
+    // Search realtime stock price
+    client.addTool(
+      { //Capabilities demo: to retrieve the latest stock for a given company
+        //e.g. get_stock_price(company: 'SAP') when valuation of SAP is heard, 
+        //user is just a tiny SAP stock holder and want to check the latest SAP stock prcie 
+        name: 'get_stock_price',
+        description:
+          'Retrieves the latest stock price for a given comppany. ',
+        parameters: {
+          type: 'object',
+          properties: {
+            company: {
+              type: 'string',
+              description: 'Name of the company',
+            },
+          },
+          required: ['company'],
+        },
+      },
+      async ({ company }: { [key: string]: any }) => {
+        /*
+        const result = await fetch(
+          `https://api.openai.com/v1/stock_price?company=${company}`
+        );*/
+        const result = {
+          ok: true,
+          date: '2024-10-25',
+          company: 'SAP',
+          price: 237.69,
+          currency: 'USD',
+        };
+        //const json = await result.json();
+        return result;
+      }
+    );    
+    // Send mail to a friend
     client.addTool(
       { //Capabilities demo: when a listener wants to send a mail to a friend
         name: 'send_mail',
@@ -1973,11 +2582,17 @@ export function ConsolePage() {
       // audio stream will be decoded and replayed in the chat lis
       await chatRef.current.updateItems(items);
     });
-
-    // hanks - Pause on-going playback when speech is detected
+    client.on('conversation.item.completed', ({ item }) => {
+      if (item.type === 'function_call') {
+        // your function call is complete, execute some custom code
+        console.log("function call completed", item);
+      }
+    });    
+    // hanks 
     client.realtime.on('server.error', () => {
       console.error("Error from server");
     });    
+    // hanks - Pause on-going playback when speech is detected
     client.realtime.on('server.input_audio_buffer.speech_started', () => {
       if (audioRef.current){
         audioRef.current.pause();
@@ -1988,6 +2603,7 @@ export function ConsolePage() {
         setIsPlaying(false);
       }
     });   
+    // hanks - Record the conversation items into the Chatbot history list
     client.realtime.on('server.conversation.item.created', async (event) => {
       const { item, delta } = client.conversation.processEvent(event);
       await chatRef.current.updateItems(client.conversation.getItems());
@@ -1995,11 +2611,11 @@ export function ConsolePage() {
       // insert one audio message to the chat list
       await chatRef.current.updateItemID(item.id); 
     });      
-    // Copilot will be activated at the first click of the mute button to unmute to ask for the first question
+    // Copilot will be activated after clicking the Connect button on the top-right corner
+    // Copilot/speaker will be muted by default to avoid unwanted interuption/cost
     client.realtime.on('server.session.created', async () => {
-      //when a new connection is established as this first server event received
+      //session.created is first server event received when a new connection is established
       //Ensure Mute/Unmute button is only active after both the connection is established and the recording is started
-
       const intervalId = setInterval(() => {
         if ('paused' === wavRecorderRef.current.getStatus()) {
           clearInterval(intervalId);
@@ -2007,7 +2623,6 @@ export function ConsolePage() {
         }
       }, 100);      
 
-      const client = clientRef.current;
       const wavRecorder = wavRecorderRef.current;
       const wavStreamPlayer = wavStreamPlayerRef.current;      
 
@@ -2016,7 +2631,7 @@ export function ConsolePage() {
 
       // Connect to audio output
       // Enhanced with one parameter to resume playback when reply speek is finished
-      await wavStreamPlayer.connect(audioRef.current, videoRef.current, setIsPlaying);
+      await wavStreamPlayer.connect(audioRef.current, videoRef.current, setIsPlaying, repeatCurrent);
       wavStreamPlayer.askStop = true;      
 
       setIsConnected(true);
@@ -2032,6 +2647,7 @@ export function ConsolePage() {
     };
   }, []);
 
+  // Test Floating Button
   interface DragEvent extends React.MouseEvent<HTMLDivElement> {
     clientX: number;
     clientY: number;
@@ -2069,55 +2685,135 @@ export function ConsolePage() {
       button.style.top = `${e.clientY - button.dragOffsetY}px`;
     }
   };
+  // Test Floating Button
 
-/**
+  /**
+     * Disconnect and reset conversation state
+     */
+  const disconnectConversation = useCallback(async () => {
+    setIsConnected(false);
+    setRealtimeEvents([]);
+    setItems([]);
+    await chatRef.current.updateItems([]);
+    setMemoryKv({});
+
+    const client = clientRef.current;
+    client.disconnect();
+
+    const wavRecorder = wavRecorderRef.current;
+    await wavRecorder.end();
+
+    const wavStreamPlayer = wavStreamPlayerRef.current;
+    await wavStreamPlayer.interrupt();
+
+    setIsMuteBtnDisabled(false);
+    setIsMuted(true);
+  }, []);  
+
+  /**
    * Disconnect and reset conversation state
    */
-const disconnectConversation = useCallback(async () => {
-  setIsConnected(false);
-  setRealtimeEvents([]);
-  setItems([]);
-  await chatRef.current.updateItems([]);
-  setMemoryKv({});
+  const disConnnectRealtimeAPI = async () => {
+    disconnectConversation();
+    closeRightArrowNew();
+  }
 
-  const client = clientRef.current;
-  client.disconnect();
+  /**
+   * Connect and start conversation/Chatbot
+   */
+  const connnectRealtimeAPI = async () => {
+    if(muteBtnRef.current) {
+      muteBtnRef.current.click(); // Trigger the button click event   
+    }      
+  };  
 
-  const wavRecorder = wavRecorderRef.current;
-  await wavRecorder.end();
+  const checkConnection = () => {
+    // Replace this with your actual connection check logic
+    console.log('Checking connection...');
+    // Example: Check if the realtime client is connected
+    if (clientRef.current && clientRef.current.isConnected()) {
+      console.log('Connected');
+    } else {
+      console.log('Not connected');
+      setIsConnected(false);      
+      // if connection is lost anaccidentally, recorder processor will not be null
+      //  => disconnect and reset the conversation state
+      // if connection is lost mannually by clicking disconnect button
+      //  => disConnnectRealtimeAPI() is already called and recorder processor is set as null;
+      // if connection is not set up yet(first time), recorder processor will be null
+      if( wavRecorderRef.current && wavRecorderRef.current.processor ) {
+        disConnnectRealtimeAPI();
+      }      
+      /*
+      if( wavRecorderRef.current && wavRecorderRef.current.processor ) {
+        disConnnectRealtimeAPI();
+      }
+      connnectRealtimeAPI();*/
+    }
+  };
 
-  const wavStreamPlayer = wavStreamPlayerRef.current;
-  await wavStreamPlayer.interrupt();
+  let menuTimeout = null; // Global timeout variable to track dismissal  
+  function showContextMenu(x, y) {
+    const menu = document.getElementById("contextMenu");
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.style.display = "block";
 
-  setIsMuteBtnDisabled(false);
-  setIsMuted(true);
-}, []);  
+    // Attach mouse leave event to manage timeout
+    menu.onmouseleave = () => {
+      menuTimeout = setTimeout(() => {
+        menu.style.display = "none";
+      }, 1000); // 3-second delay
+    };
 
-/**
- * Disconnect and reset conversation state
- */
-const disConnnectRealtimeAPI = async () => {
-  disconnectConversation();
-  closeRightArrowNew();
-}
+    // Clear the timeout if the mouse re-enters
+    menu.onmouseenter = () => {
+        clearTimeout(menuTimeout);
+      };        
 
-/**
- * Connect and start conversation/Chatbot
- */
-const connnectRealtimeAPI = async () => {
-  if(muteBtnRef.current) {
-    muteBtnRef.current.click(); // Trigger the button click event   
-  }      
-};  
+  }
+  
+  function hideContextMenu() {
+    const menu = document.getElementById("contextMenu");
+    const menuInput = document.getElementById('menuInput');   
 
-//Test for variable evaluation in template string dynamically
-let audioUrl = "";
-let transcript = "";
-const getMarkdownContent = () => `
-${transcript}  
-<audio src="${audioUrl}" controls></audio>
-`; 
+    (menuInput as HTMLInputElement).value = '';
+    menu.style.display = "none";
+  }  
 
+  function handleAction(action) {
+    const selectedText = window.getSelection().toString();
+  
+    if (action === "whatIsThis") {
+      alert(`Searching for: ${selectedText}`);
+    } else if (action === "seePicture") {
+      alert(`Displaying pictures for: ${selectedText}`);
+    } else if (action === "searchWeb") {
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(selectedText)}`);
+    } else if (action === "ask") {
+      alert(`Asking about: ${selectedText}`);
+    }
+  
+    hideContextMenu(); // 操作完成后隐藏菜单
+  }  
+
+  useEffect(() => {
+    // Set up the interval to check the connection every 5 seconds
+    const intervalId = setInterval(checkConnection, 5000);
+
+    // Cleanup the interval on component unmount
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [clientRef.current]);
+
+  //Test for variable evaluation in template string dynamically
+  let audioUrl = "";
+  let transcript = "";
+  const getMarkdownContent = () => `
+  ${transcript}  
+  <audio src="${audioUrl}" controls></audio>
+  `;   
 
   /**
    * Render the application
@@ -2125,16 +2821,69 @@ ${transcript}
   return (
     <div data-component="ConsolePage">
       
-      {/* Popup Layer for display the video from youtube search or AI Chatbot  */}      
+      {/* Popup Layer for display the video from youtube search triggered by Realtime API  */}      
       <div id="popupOverlay" className="popup-overlay">
         <div id="popupContent" className="popup-content-chat">
           <span id="closePopup" className="close-button"><X /></span>
-          <iframe id="videoFrame" width="1000" height="562.5" src="" allow="fullscreen" allowFullScreen style={{display: 'none'}}></iframe>
+          <iframe id="videoFrame" width="800" height="450" src="" allow="fullscreen" allowFullScreen style={{display: 'none'}}></iframe>
           <iframe id="chatBot" width="100%" height="100%" src="http://localhost:4000/examples/audio-copilot" allow="fullscreen" allowFullScreen style={{display: 'none', borderRadius: '9px'}}></iframe> 
         </div>
       </div>
 
+      {/* ContextMenu when text selected  */}   
+      <div id="contextMenu" style={{position: 'absolute', display: 'none'}}>
+        <ul>
+          <li id='readAloudLi'>Read Aloud</li>
+          <li id='searchVideosLi'>Search Videos</li>
+          <li style={{display: 'none'}}>Search the web</li>
+          <li id='talkAboutSelection'>Have a talk</li>
+          <li><input id='menuInput' placeholder="Ask Anything..." style={{marginRight: '5px'}}></input><button onClick={btnClickFromCM}>Ask</button></li>
+        </ul>
+      </div>
+
+      <div id="openKeywords" className="floating-open-button" onClick={openKeywords} style={{display: 'flex'}} title='Selec a Keyword to dive in'><BookOpen style={{ width: '18px', height: '18px' }} /></div>
+      {/* Click keyword to go to specific page and seek the current time */}
+      <ul id="floatingKeywords" className="floating-keywords" style={{display: 'none'}}> 
+        <span id="closeKeywords" className="close-button-keywords"><X /></span>
+        <div style={{position:'absolute', top: '10px', left: '10px', zIndex: '9990', fontWeight: 'bold', userSelect: 'none'}} title='Select a keyword to dive in'>Keywords<Key style={{width: '15px', height: '15px'}} /></div><br />
+        {Object.entries(Keywords.current as Record<string, [number, number, number]>).map(([key, [value1, value2, value3]], index) => value3 !== 0 && (
+          <li
+            key={index} // Use index as the key for React
+            style={{
+              backgroundColor: keyword === key ? '#666' : '#f9f9f9', // Darker if active
+              color: keyword === key ? '#fff' : '#000', // Adjust text color for contrast
+              borderRadius: '0.3125em',
+              whiteSpace: 'nowrap',
+            }}
+            //onClick={(e) => handleKeywordClick(e, key, value1, value2, value3)} // Directly play the keyword segment
+            onClick={(e) => loopKeywordPlay(e, key, value1, value2, value3)} // Loop play the keyword segment
+          >
+            {index+1}.{key} {/* Display the key */}
+          </li> 
+        ))}
+      </ul>
+
+      {/* Floating buttons for control the caption size and repeat current/last caption */}
+      <ul className="floating-captionsize" style={{display: !isCaptionVisible && 'none' }}>
+        <li onClick={repeatCurrent}><div title='Repeat current caption'><Repeat style={{ width: '13px', height: '13px' }} /></div></li>
+        <li onClick={repeatPrevious}><SkipBack style={{ width: '13px', height: '13px' }} /></li>
+        <li onClick={() => adjustCaptionFontSize(+0.1)}><ZoomIn style={{ width: '13px', height: '13px' }} /></li>
+        <li onClick={() => adjustCaptionFontSize(-0.1)}><ZoomOut style={{ width: '13px', height: '13px' }} /></li>
+      </ul>
       {/* Test Floating button */}
+      <div className="floating-button" ref={floatingButtonRef}  
+             onMouseDown={handleDragStart}
+             onMouseMove={handleDrag}
+             style={{display: "none"}}
+        >
+          <Button
+            style={{ height: '10px'}}
+            label={'WebRTC Test'}
+            buttonStyle={'flush'}
+            //onClick={showConversation}
+            className='button'
+          />
+        </div>      
       { (items.length < 0) && (!isCaptionVisible) &&
         <div className="floating-button" ref={floatingButtonRef}  
              onMouseDown={handleDragStart}
@@ -2147,114 +2896,177 @@ ${transcript}
             onClick={showConversation}
             className='button'
           />
-        </div>}    
+        </div>
+      }    
 
       {/* Top buttons in row to control PDF operation */}
       <div className="top-hover-area">
-      <div id='button-row-top' className='button-row-top'>
-        <Button
-          style={{height: '10px'}}
-          label={''}
-          icon={Plus}
-          buttonStyle={'flush'}
-          onClick={zoomIn}
-          className='button'
-        />
-        <Button
-          style={{height: '10px'}}
-          label={''}
-          icon={Minus}
-          buttonStyle={'flush'}
-          onClick={zoomOut}
-          className='button'
-        />     
-        <Button
-          style={{height: '10px'}}
-          label={'WebRTC Test'}
-          onClick={test_webrtc}
-        />
-        <div className="right-buttons">
-          {/*<div style={{ fontSize: '1em' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Error Occurred!</span></> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div> */}
-          <div>
-            <Button
-                label={isConnected ? 'Disconnect' : (isMuteBtnDisabled ? startingText : 'Connect\u00A0\u00A0\u00A0' ) }
-                iconPosition={isConnected ? 'end' : 'start'}
-                icon={isConnected ? X : Zap}
-                //buttonStyle={isConnected ? 'regular' : 'action'}
-                disabled={isMuteBtnDisabled}
-                onClick={ isConnected ? disConnnectRealtimeAPI : connnectRealtimeAPI }
-              />    
-          </div>                        
-          <div className="content-api-key">
-            {!LOCAL_RELAY_SERVER_URL && (
+        <div className="arrowdown" style={{display:'none'}}></div>
+        <div id='button-row-top' className='button-row-top'>
+          <div style={{display: 'none'}}>
+            <Plus style={{ width: '20px', height: '20px', marginLeft: '2px', cursor: 'pointer' }} onClick={zoomIn}/>
+            <Minus style={{ width: '20px', height: '20px', marginLeft: '2px', cursor: 'pointer' }} onClick={zoomOut}/>
+          </div>
+          <Button
+            style={{height: '10px'}}
+            label={''}
+            icon={Plus}
+            buttonStyle={'flush'}
+            onClick={zoomIn}
+            className='button'
+          />
+          <Button
+            style={{height: '10px'}}
+            label={''}
+            icon={Minus}
+            buttonStyle={'flush'}
+            onClick={zoomOut}
+            className='button'
+          />   
+          <Button
+            style={{height: '10px'}}
+            label={''}
+            icon={Layout}
+            buttonStyle={'flush'}
+            onClick={togglePageView}
+            className='button'
+            title={isTwoPageView ? 'Single Page View' : 'Two Page View'}
+          />                    
+          <div title={isTwoPageView ? 'Single Page View' : 'Two Page View'} style={{display: 'none'}}>
+            <Layout style={{ width: '20px', height: '20px', marginLeft: '2px', cursor: 'pointer' }} onClick={togglePageView}/>
+          </div>               
+          <div className='magzine-title' style={{height: '25px', justifyContent: 'center', marginLeft: 'auto', marginRight: 'auto', userSelect: 'none'}}><img src='./resource/ngl.png' width="70px" height="20px" style={{marginRight: "5px"}}></img>{newMagzine}
+          </div>                    
+          <Button
+            style={{height: '10px', display: 'none'}}
+            label={'WebRTC Test'}
+            //onClick={test_webrtc}
+            onClick={showConversation}
+          />
+          <div className="right-buttons" style={{userSelect: 'none'}}>
+            {/*<div style={{ fontSize: '1em' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Error Occurred!</span></> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div> */}
+            <div>
               <Button
-                icon={Edit}
-                iconPosition="end"
-                buttonStyle="flush"
-                label={`\u00A0`}
-                title="Reset the OpenAI API Key"
-                onClick={() => resetAPIKey()}
-              />
-            )}
-          </div>  
-        </div>      
-      </div>
+                  label={isConnected ? 'Disconnect' : (isMuteBtnDisabled ? startingText : 'Connect\u00A0\u00A0\u00A0' ) }
+                  iconPosition={isConnected ? 'end' : 'start'}
+                  icon={isConnected ? X : Zap}
+                  //buttonStyle={isConnected ? 'regular' : 'action'}
+                  disabled={isMuteBtnDisabled}
+                  onClick={ isConnected ? disConnnectRealtimeAPI : connnectRealtimeAPI }
+                />    
+            </div>                     
+            <div className="content-api-key" style={{display: 'none'}}>
+              {!LOCAL_RELAY_SERVER_URL && (
+                <Button
+                  //icon={Edit}
+                  icon={Layout}
+                  iconPosition="end"
+                  buttonStyle="flush"
+                  label={`\u00A0`}
+                  title="Reset the OpenAI API Key"
+                  onClick={() => resetAPIKey()}
+                />
+              )}
+            </div>             
+          </div>      
+        </div>
       </div>
 
       <div className="content-main" ref={leftRef}>
+        {/* Test: try to show icon to play audio on each page of the PDF file */}
+        {/* Test: PdfViewerWithIcons is still not work */}
+        <div style={{display: 'none'}}>
+          <PdfViewerWithIcons
+            pdfFilePath={pdfFilePath1} // Path to the PDF file
+          />
+        </div> 
 
         {/* Left Area to display PDF Magzine */}
-        {/*First div is to control display the scrollbar*/}
-        <div style={{
-          display: 'none', 
-        }}>
-          <PdfViewerWithIcons
-            pdfFilePath={pdfFilePath} // Path to the PDF file
-          />
-        </div>         
-        <div style={{
+        {/*First div is to control display the scrollbar*/}                
+        <div id="pdfContainer" style={{
           display: 'flex',        // Enable flexbox
+          position: 'relative',   // Enable absolute positioning
           //display: 'none',        // Enable flexbox
           margin: '0 auto',       // Center horizontally
           //marginTop: '2.5em', 
           width: '100%',           // Adjust the width as needed
           overflowY: 'auto',      // Enable scrolling
           scrollbarWidth: 'auto',
-          top: '400px', 
+          //top: '400px', 
+          top: '0px', 
         }}>
+          <div className="top-floating-line"></div>
           <div ref={containerRef}  // Attach zoom handler to this container only
                     style={{       
                       margin: '0 auto',       // Center horizontally
                       width: '100%',           // Adjust the width as needed
                       overflowY: 'auto',      // Enable scrolling
                       scrollbarWidth: 'none', // Hide scrollbar 
-                      top: '400px',               // Top of the viewport
+                      //top: '400px',               // Top of the viewport
+                      top: '0px',               // Top of the viewport
                       backgroundColor: 'white', // Optional: background color
                       transform: `scale(${scale})`, // Apply CSS transform for zooming
                       transformOrigin: 'top center', // Set the origin for the transform                    
                 }}>
-            <Document file={pdfFilePath} onLoadSuccess={onDocumentLoadSuccess}>
+            {/*<Document file={pdfFilePath} onLoadSuccess={onDocumentLoadSuccess}>*/}
+            <Document file={pdfFilePath1} onLoadSuccess={onDocumentLoadSuccess}>
 
+              {/* Previous Logic
               {renderedPages.map((pageNumber) => (
+                <div
+                  ref={pageRefs.current[pageNumber]}
+                  key={`page_${pageNumber + 1}`}
+                  style={{
+                    marginBottom: '10px',
+                    flexShrink: 0, // Prevent shrinking
+                    margin: '20px auto', // Center the page horizontally
+                    width: 'fit-content', // Shrink wrapper to fit content width                    
+                  
+                  }}
+                >            
+                  <Page
+                    key={`page_${pageNumber}`}
+                    pageNumber={pageNumber}
+                    renderTextLayer={true} 
+                    renderAnnotationLayer={false}               
+                    onLoadSuccess={() => onPageLoadSuccess({ pageNumber })} // Incrementally add pages
+                    loading={<p>Loading page {pageNumber}...</p>} // Page loading indicator
+                  />
+                </div>
+              ))} */}
+
+              {/* Page Rendering */}
+              {getPagePairs(renderedPages).map((pagePair, index) => (
+                <div
+                  key={`pair_${index}`}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: isTwoPageView ? '0px' : '10px',
+                    marginBottom: '5px',
+                    margin: '8px auto',
+                    width: 'fit-content',
+                  }}
+                >
+                  {pagePair.map((pageNumber) => (
                     <div
-                    ref={pageRefs.current[pageNumber]}
-                    key={`page_${pageNumber + 1}`}
-                    style={{
-                      marginBottom: '10px',
-                      flexShrink: 0, // Prevent shrinking
-                      margin: '20px auto', // Center the page horizontally
-                      width: 'fit-content', // Shrink wrapper to fit content width                    
-                    
-                    }}
-                  >            
-                <Page
-                  key={`page_${pageNumber}`}
-                  pageNumber={pageNumber}
-                  renderTextLayer={true} 
-                  renderAnnotationLayer={false}               
-                  onLoadSuccess={() => onPageLoadSuccess({ pageNumber })} // Incrementally add pages
-                  loading={<p>Loading page {pageNumber}...</p>} // Page loading indicator
-                />
+                      ref={pageRefs.current[pageNumber]}
+                      key={`page_${pageNumber}`}
+                      style={{
+                        flexShrink: 0,
+                        margin: 0, // Reset margin since it's handled by the pair container
+                      }}
+                    >
+                      <Page
+                        pageNumber={pageNumber}
+                        renderTextLayer={true}
+                        renderAnnotationLayer={false}
+                        onLoadSuccess={() => onPageLoadSuccess({ pageNumber })}
+                        loading={<p>Loading page {pageNumber}...</p>}
+                        width={isTwoPageView ? 400 : 800} // 调整页面宽度
+                      />
+                    </div>
+                  ))}
                 </div>
               ))}
 
@@ -2264,122 +3076,157 @@ ${transcript}
 
         {/* Splitter Area */}
         {/* Open(Left Arrow<-) or Close((Right Arrow->)) Right Panel */}
-        <div className="tooltip-container">
-        <div id="openRightArrow" className="close-icon-right" onClick={openChatbot} style={{display: (isConnected? "flex": "none")}}><ArrowLeft style={{ width: '15px', height: '15px' }} /></div>
-        <div className="tooltip"><span><strong className='tooltip-title'>Open Chatbot</strong></span></div></div>
-        <div id="closeRightArrow" className="close-icon-left" onClick={closeRightArrowNew} style={{display: "none"}}><ArrowRight style={{ width: '15px', height: '15px' }} /></div>
+        <div className="button-container">
+          <div id="openRightArrow" className="close-icon-right" onClick={openChatbot} style={{display: (isConnected? "flex": "none")}}><ArrowLeft style={{ width: '18px', height: '18px' }} /></div>
+          <div className="tooltip1"><span>Open Chatbot</span></div>
+        </div>
+        <div  id="closeRightArrow" className="close-icon-left" onClick={closeRightArrowNew} style={{display: "none"}}><ArrowRight style={{ width: '18px', height: '18px' }} /></div>
+        {/* tooltip for the left button still does not work */}
+        {/* <div id="closeRightArrow" className="button-container">
+              <div  id="closeRightArrow" className="close-icon-left" onClick={closeRightArrowNew} style={{display: "none"}}><ArrowRight style={{ width: '15px', height: '15px' }} /></div>
+              <div className="tooltip1"><span><strong className='tooltip-title'>Close Chatbot</strong></span>
+              </div>
+            </div> */}
+
         <div id="splitter" className="splitter" onMouseDown={handleSplitterMouseDown} style={{display: "none"}}></div>
 
         {/* Right Area: show the chatbot and conversation list on the right side panel */}
         <div className="content-right" ref={rightRef} style={{display: "none"}}>
-          <div id="chatContainer" style={{display: "none"}}><Chat functionCallHandler={functionCallHandlerForChat} ref={chatRef} /></div>
+          <div id="chatContainer" style={{display: "none"}}><Chat functionCallHandler={functionCallHandlerForChat} realtimeClient={clientRef.current} ref={chatRef} /></div>
 
+          {/*content-main for test purpose*/}
           <div className="content-main" ref={conversationDivRef} style={{display: "none"}}>
-                <div className="content-logs">
-                  <div className="content-block conversation">
-                    {/*<div className="content-block-title">Conversation List</div>*/}
-                    <div className="content-block-body" data-conversation-content>
-                      {/*{!items.length && `awaiting connection...`}*/}
-                      {!items.length && `Conversation List`}
-                      {items.map((conversationItem, i) => {
-                        return (
-                          <div className="conversation-item" key={conversationItem.id}>
-                            <div className={`speaker ${conversationItem.role || ''}`}>
-                              <div>
-                                {(
-                                  conversationItem.role || conversationItem.type
-                                ).replaceAll('_', ' ')}
-                              </div>
-                              <div
-                                className="close"
-                                onClick={() =>
-                                  deleteConversationItem(conversationItem.id)
-                                }
-                              >
-                                <X />
-                              </div>
-                            </div>
-                            <div className={`speaker-content`}>
-                              {/* tool response */}
-                              {conversationItem.type === 'function_call_output' && (
-                                <div>{conversationItem.formatted.output}</div>
-                              )}
-                              {/* tool call */}
-                              {!!conversationItem.formatted.tool && (
-                                <div>
-                                  {conversationItem.formatted.tool.name}(
-                                  {conversationItem.formatted.tool.arguments})
-                                </div>
-                              )}
-                              {!conversationItem.formatted.tool &&
-                                conversationItem.role === 'user' && (
-                                  <div>
-                                    {conversationItem.formatted.transcript ||
-                                      (conversationItem.formatted.audio?.length
-                                        ? '(awaiting transcript)'
-                                        : conversationItem.formatted.text ||
-                                          '(item sent)')}
-                                  </div>
-                                )}
-                              {!conversationItem.formatted.tool &&
-                                conversationItem.role === 'assistant' && (
-                                  <div>
-                                    {conversationItem.formatted.transcript ||
-                                      conversationItem.formatted.text ||
-                                      '(truncated)'}
-                                  </div>
-                                )}
-                              {conversationItem.formatted.file && (() => {
-                                  console.log("Audio URL:", conversationItem.formatted.file.url); 
-                                  //console.log("Audio:", conversationItem.status);
-                                  return (
-                                    <audio
-                                      src={conversationItem.formatted.file.url}
-                                      controls
-                                    />
-                                  );
-                                })()
-                              }
-                            </div>
+            {/*Test(tbd): show WebRTC examples of communicating Realtime API on the right side panel*/}
+            <main className="absolute top-16 left-0 right-0 bottom-0"  style={{display: "none"}}>
+                <section className="absolute top-0 left-0 right-[380px] bottom-0 flex">
+                  {/*
+                  <section className="absolute top-0 left-0 right-0 bottom-32 px-4 overflow-y-auto">
+                    <EventLog events={events} />
+                  </section> */}
+                  <section className="absolute h-32 left-0 right-0 bottom-0 p-4">
+                    <SessionControls
+                      startSession={startSession}
+                      stopSession={stopSession}
+                      sendClientEvent={sendClientEvent}
+                      sendTextMessage={sendTextMessage}
+                      serverEvents={events}
+                      isSessionActive={isSessionActive}
+                    />
+                  </section>
+                </section>
+            </main>
+            {/*Test: show the Realtime API conversations on the right side panel*/}
+            <div className="content-logs"  style={{display: "none"}}>
+              <div className="content-block conversation">
+                {/*<div className="content-block-title">Conversation List</div>*/}
+                <div className="content-block-body" data-conversation-content>
+                  {/*{!items.length && `awaiting connection...`}*/}
+                  {!items.length && `Conversation List`}
+                  {items.map((conversationItem, i) => {
+                    return (
+                      <div className="conversation-item" key={conversationItem.id}>
+                        <div className={`speaker ${conversationItem.role || ''}`}>
+                          <div>
+                            {(
+                              conversationItem.role || conversationItem.type
+                            ).replaceAll('_', ' ')}
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                          <div
+                            className="close"
+                            onClick={() =>
+                              deleteConversationItem(conversationItem.id)
+                            }
+                          >
+                            <X />
+                          </div>
+                        </div>
+                        <div className={`speaker-content`}>
+                          {/* tool response */}
+                          {conversationItem.type === 'function_call_output' && (
+                            <div>{conversationItem.formatted.output}</div>
+                          )}
+                          {/* tool call */}
+                          {!!conversationItem.formatted.tool && (
+                            <div>
+                              {conversationItem.formatted.tool.name}(
+                              {conversationItem.formatted.tool.arguments})
+                            </div>
+                          )}
+                          {!conversationItem.formatted.tool &&
+                            conversationItem.role === 'user' && (
+                              <div>
+                                {conversationItem.formatted.transcript ||
+                                  (conversationItem.formatted.audio?.length
+                                    ? '(awaiting transcript)'
+                                    : conversationItem.formatted.text ||
+                                      '(item sent)')}
+                              </div>
+                            )}
+                          {!conversationItem.formatted.tool &&
+                            conversationItem.role === 'assistant' && (
+                              <div>
+                                {conversationItem.formatted.transcript ||
+                                  conversationItem.formatted.text ||
+                                  '(truncated)'}
+                              </div>
+                            )}
+                          {conversationItem.formatted.file && (() => {
+                              console.log("Audio URL:", conversationItem.formatted.file.url); 
+                              //console.log("Audio:", conversationItem.status);
+                              return (
+                                <audio
+                                  src={conversationItem.formatted.file.url}
+                                  controls
+                                />
+                              );
+                            })()
+                          }
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Bottom toolbar area to display different buttons, captions, progress bar, mute/unmute button */}
       <div id='button-row' className='button-row'>
-        {/* Adjust the caption font size if it is visible */}
-        {isCaptionVisible && ( 
-          <div>
-            <div className="captionFont" style={{cursor:'pointer'}} onClick={() => {adjustCaptionFontSize(+0.1)}}>+</div>
-            <div className="captionFont" style={{cursor:'pointer'}} onClick={() => {adjustCaptionFontSize(-0.1)}}>-</div>            
-          </div> )
-        }
-
+        {/*Test: adjust the caption font size if it is visible */} 
+        {/*Test: captionsize-container demos to show tool tip on the left of the page */} 
+        <div className="captionsize-container" style={{display: 'none'}}>                  
+          <div style={{pointerEvents: isCaptionVisible? 'auto' : 'none'}}>
+              <div className="captionFont" style={{cursor:'pointer'}} onClick={() => {adjustCaptionFontSize(+0.1)}}>+</div>
+              <div className="captionFont" style={{cursor:'pointer'}} onClick={() => {adjustCaptionFontSize(-0.1)}}>-</div>            
+          </div>
+          <div className="captionsize" style={{display: isCaptionVisible? 'none' : 'flex'}}>Show caption to adjust it's size</div>
+        </div>
         {/* Add a div to display the current caption */}
         {isCaptionVisible && ( 
           <div id='captionDisplay' className="caption-display"
-              dangerouslySetInnerHTML={{ __html: currentCaption }}
-              style={{ fontSize: '2em', marginTop: '20px' }}
+               dangerouslySetInnerHTML={{ __html: currentCaption }}
+               style={{ fontSize: '2em', marginTop: '20px', width: `${captionWidth}%`, opacity: '1' }}
           ></div> )
         } 
-        <div className="content-caption">
+
+        {/* Show/Hide Captions Button */}
+        <div className="content-caption" style={{userSelect: 'none'}}>
           <Button
-                    label={isCaptionVisible ? 'Hide Captions' : 'Show Captions'}
-                    buttonStyle={'regular'}
-                    onClick={toggleCaptionVisibility}
-                    className='button'
-                  />           
+                  label={isCaptionVisible ? 'Hide Caption' : 'Show Caption'}
+                  buttonStyle={'regular'}
+                  iconPosition={'start'}
+                  icon={AlignCenter}                  
+                  onClick={toggleCaptionVisibility}
+                  className='button'
+          />                      
         </div>
 
+        {/* Play/Pause Button */}
         {/* This hidden button is to receive space bar down event to play/pause the audio */}
         <button ref={playPauseBtnRef} onClick={toggleAudio} className='hidden-button'></button>
-        <div className="tooltip-container">
+        <div className="tooltip-container" style={{userSelect: 'none'}}>
           <Button
                   label={isPlaying ? 'Pause' : 'Play\u00A0'}
                   iconPosition={'start'}
@@ -2388,7 +3235,7 @@ ${transcript}
                   onClick={toggleAudio}
                   className='button'
           />
-          <div className="tooltip">
+          <div className="tooltip"  style={{display: isCaptionVisible? 'none' : 'flex'}}>
             <span>Press Space(空格键) to <> {isPlaying ? 'Pause' : 'Play'} </> the on-going Audio</span><br />
           </div>             
         </div>
@@ -2396,18 +3243,22 @@ ${transcript}
         {/* Progress bar area */}
         <div 
           ref={progressBarRef}
-          style={{position: 'relative', width: '60%', backgroundColor: '#ccc', height: '0.625em', borderRadius: '0.3125em', marginTop: '0.2em', marginLeft: '-1px' }}
+          style={{position: 'relative', width: '65%', backgroundColor: '#ccc', height: '0.625em', borderRadius: '0.3125em', marginTop: '0.2em', marginLeft: '-1px', userSelect: 'none' }}
           onMouseDown={handleMouseDown}>
           <div style={{ 
                         width: `${progress}%`,
                         backgroundColor: '#007bff',
                         height: '0.625em',
-                        borderRadius: '0.3125em' }}
+                        borderRadius: '0.3125em'
+                       }}
           />
           {/* Three Speed control Options at the left-down of progress area */}
           <div className="speed-controls" onMouseDown={(e) => {
                                                                 e.stopPropagation(); // Prevent event from reaching the progress bar
-                                                              }}>
+                                                              }}>         
+            <div></div>                   
+            {/* Three Speed control Options: Slower/Normal/Faster */}                                           
+            <TrendingUp style={{ width: '17px', height: '17px' }} />                                                      
             <div className="speed-control" style={{ 
               backgroundColor: playbackRate === 0.85 ? '#666' : '#ccc', // Darker if active
               color: playbackRate === 0.85 ? '#fff' : '#000', // Adjust text color for contrast
@@ -2423,33 +3274,70 @@ ${transcript}
               color: playbackRate === 1.2 ? '#fff' : '#000', // Adjust text color for contrast
               borderRadius: '0.3125em',
             }}    onClick={(e) => handleSpeedControlClick(e, 1.2)}>Faster</div>  
-            <div></div>
+            {/* Loop button to loop the current audio 
+            <div></div> 
             <div className="speed-control"         style={{
               display: 'none',
               backgroundColor: isLoop === true ? '#666' : '#ccc', // Darker if active
               color: isLoop === true ? '#fff' : '#000', // Adjust text color for contrast
               borderRadius: '0.3125em',
-            }}    onClick={(e) => handleLoopClick(e)}>Loop</div>  
-            <div className="spacer" />           
-            <div>Keywords:</div>
-            {/* Click keyword to go to specific page and seek the current time */}
-            {Object.entries(keywords).map(([key, [value1, value2, value3]], index) => (
-              <div
-                key={index} // Use index as the key for React
-                className="keyword"
-                style={{
-                  backgroundColor: keyword === key ? '#666' : '#ccc', // Darker if active
-                  color: keyword === key ? '#fff' : '#000', // Adjust text color for contrast
-                  borderRadius: '0.3125em',
-                  whiteSpace: 'nowrap',
-                }}
-                //onClick={(e) => handleKeywordClick(e, key, value1, value2, value3)} // Directly play the keyword segment
-                onClick={(e) => loopKeywordPlay(e, key, value1, value2, value3)} // Loop play the keyword segment
-              >
-                {key} {/* Display the key */}
-              </div>
-            ))}                         
-            {/* Place the search box for video at the right-down of progress bar area */}  
+            }}    onClick={(e) => handleLoopClick(e)}>Loop</div>    */}     
+                                       
+            <div><span className="separator">|</span></div>
+
+            {/* Three Volume control Options: Lower/Normal/Louder */} 
+            <Volume style={{ width: '17px', height: '17px' }} />
+            <div className="speed-control" style={{ 
+              backgroundColor: playbackVolume === 0.50 ? '#666' : '#ccc', // Darker if active
+              color: playbackVolume === 0.50 ? '#fff' : '#000', // Adjust text color for contrast
+              borderRadius: '0.3125em',
+            }}  onClick={(e) => handleVolumeControlClick(e, 0.50)}>Lower</div>
+            <div className="speed-control"         style={{
+              backgroundColor: playbackVolume === 0.75 ? '#666' : '#ccc', // Darker if active
+              color: playbackVolume === 0.75 ? '#fff' : '#000', // Adjust text color for contrast
+              borderRadius: '0.3125em',
+            }}    onClick={(e) => handleVolumeControlClick(e, 0.75)}>Normal</div>
+            <div className="speed-control"         style={{
+              backgroundColor: playbackVolume === 1.0 ? '#666' : '#ccc', // Darker if active
+              color: playbackVolume === 1.0 ? '#fff' : '#000', // Adjust text color for contrast
+              borderRadius: '0.3125em',
+            }}    onClick={(e) => handleVolumeControlClick(e, 1.0)}>Louder</div>   
+
+            <div><span className="separator">|</span></div>
+            <div className="tooltip-container" style={{userSelect: 'none'}}>
+              <div title={keyword === '' ? 'Select a Keyword to Dive in' : '' }><BookOpen style={{ width: '17px', height: '17px' }} /></div>
+              <div className="tooltip" style={{backgroundColor: 'rgb(255, 255, 255, 1)', width: 'auto', height: 'auto', paddingRight: '10px' }}>
+                <ul> 
+                  {Object.entries(Keywords.current as Record<string, [number, number, number]>).map(([key, [value1, value2, value3]], index) => value3 !== 0 && (
+                    <li
+                      key={index} // Use index as the key for React
+                      style={{
+                        backgroundColor: keyword === key ? '#666' : '#f9f9f9', // Darker if active
+                        color: keyword === key ? '#fff' : '#000', // Adjust text color for contrast
+                        borderRadius: '0.3125em',
+                        whiteSpace: 'nowrap',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        marginRight: '20px',
+                      }}
+                      onClick={(e) => loopKeywordPlay(e, key, value1, value2, value3)} // Loop play the keyword segment
+                    >
+                      {/*{index+1}.{key}  Display the key */}
+                      {index+1}.{key}
+                    </li>
+                  ))}
+                </ul>
+
+              </div> 
+            </div>
+            <div className="speed-control"         style={{
+              display: keyword === '' ? 'none' : 'flex',
+              backgroundColor: keyword !== '' ? '#666' : '#ccc', // Darker if active
+              color: keyword !== '' ? '#fff' : '#000', // Adjust text color for contrast
+              borderRadius: '0.3125em',
+            }}    onClick={(e) => handleClearKeyword(e)} title='Clear Keyword Play'>{keyword === '' ? 'Select a Keyword to Dive in' : keyword }</div> 
+
+            {/* Test: Place the search box for video at the right-down of progress bar area */}  
             <div style={{position: 'fixed', transform:'translateX(41.5em)', bottom: '1px'}}>
               <input id="searchBox" 
                     type="text"                      
@@ -2485,18 +3373,6 @@ ${transcript}
           </div>          
         </div>  
 
-        {/* AI Button to display the Right panel to ask Question */}
-        <div className="tooltip-container">
-          <Button
-                label={'Chatbot'}
-                buttonStyle={'regular'}
-                disabled={!isConnected}
-                onClick={openChatbot}
-              /> 
-          <div className="tooltip">
-            <span><strong className='tooltip-title'>Open an AI Chatbot to: </strong><br/>Ask for general questions or Search a Video from youtube or Search in the Magzine</span><br />
-          </div>             
-        </div>
         {/* Mute/Unmute Button to have a real time conversion */}                      
         <button ref={muteBtnRef} onClick={toggleMuteRecording} className='hidden-button'></button>  
         <div className="tooltip-container">
@@ -2510,14 +3386,80 @@ ${transcript}
               buttonStyle={'regular'}
               onClick={toggleMuteRecording}
             />
-          <div className="tooltip">
+          <div className="tooltip"  style={{display: isCaptionVisible && 'none'}}>
             <strong className='tooltip-title'>Turn <>{isMuted ? 'on' : 'off'}</> microphone</strong><br />
-            {!isConnected && <>The <span className="highlightred">first</span> turning on will start the Audio Copilot.<br /><br /> </>}
+            {!isConnected && <> <span className="highlightred">Conntect First!</span> to have a real time conversation during playback on-going.<br /><br /> </>}
             {isConnected && <><br /> </>}
           </div>            
         </div>   
         {/*Display Copilot Status*/}      
-        <div style={{ fontSize: '1em' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Error Occurred!</span></> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div>      
+        <div style={{ fontSize: '1em', userSelect: 'none' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Error Occurred!</span></> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div>      
+        
+        {/*Settings for AI assistant and Realtime API*/} 
+        <div style={{display:"flex", marginRight: "0px", marginLeft: "auto", justifyContent: "flex-end", zIndex: '9999', userSelect: 'none' }}>    
+          <div className="setting-container" style={{display: "flex"}}>
+            <Settings style={{ width: '20px', height: '20px', marginRight: '1px' }}/>
+            <div className="setting">
+              <strong className='setting-title'>Setting</strong><br /><br />
+              {/*Settings for Voice selection of Realtime API*/} 
+              <div className="speed-controls" style={{pointerEvents: isConnected? 'none' : 'auto'}} onMouseDown={(e) => {
+                                                              e.stopPropagation(); // Prevent event from reaching the progress bar
+                                                            }}>
+                <div title='Select a voice to chat'><User style={{ width: '13px', height: '13px' }} />:</div>                                               
+                <div className="speed-control"         style={{
+                  backgroundColor: rtVoice === 'alloy' ? '#666' : '#ccc', // Darker if active
+                  color: rtVoice === 'alloy' ? '#fff' : '#000', // Adjust text color for contrast
+                  borderRadius: '0.3125em',
+                }}    onClick={(e) => handleVoiceControlClick(e, 'alloy')}>alloy</div>                
+                <div className="speed-control" style={{ 
+                  backgroundColor: rtVoice === 'ash' ? '#666' : '#ccc', // Darker if active
+                  color: rtVoice === 'ash' ? '#fff' : '#000', // Adjust text color for contrast
+                  borderRadius: '0.3125em',
+                }}  onClick={(e) => handleVoiceControlClick(e, 'ash')}>ash</div>
+                <div className="speed-control"         style={{
+                  backgroundColor: rtVoice === 'sage' ? '#666' : '#ccc', // Darker if active
+                  color: rtVoice === 'sage' ? '#fff' : '#000', // Adjust text color for contrast
+                  borderRadius: '0.3125em',
+                }}    onClick={(e) => handleVoiceControlClick(e, 'sage')}>sage</div>  
+                <div className="speed-control"         style={{
+                  backgroundColor: rtVoice === 'coral' ? '#666' : '#ccc', // Darker if active
+                  color: rtVoice === 'coral' ? '#fff' : '#000', // Adjust text color for contrast
+                  borderRadius: '0.3125em',
+                }}    onClick={(e) => handleVoiceControlClick(e, 'coral')}>coral</div> 
+                <div className="speed-control"         style={{
+                  backgroundColor: rtVoice === 'shimmer' ? '#666' : '#ccc', // Darker if active
+                  color: rtVoice === 'shimmer' ? '#fff' : '#000', // Adjust text color for contrast
+                  borderRadius: '0.3125em',
+                }}    onClick={(e) => handleVoiceControlClick(e, 'shimmer')}>shimmer</div>  
+                <div className="speed-control"         style={{
+                  backgroundColor: rtVoice === 'echo' ? '#666' : '#ccc', // Darker if active
+                  color: rtVoice === 'echo' ? '#fff' : '#000', // Adjust text color for contrast
+                  borderRadius: '0.3125em',
+                }}    onClick={(e) => handleVoiceControlClick(e, 'echo')}>echo</div>                                 
+              </div>  
+              {/*Assistant ID regeneration*/} 
+              <div className="speed-controls">
+                <div title='Regenerate Assistant ID'><UserPlus style={{ width: '13px', height: '13px' }} />:</div>
+                <div>{localStorage.getItem('tmp::asst_id').slice(0, 5)}...</div>
+              </div>               
+              {/*API Key Reset*/}     
+              <div className="speed-controls">
+                <div title='Reset API Key'><Edit style={{ width: '13px', height: '13px' }} onClick={() => resetAPIKey()} />:</div>
+                <div>{localStorage.getItem('tmp::voice_api_key').slice(0, 3)}...</div>                
+              </div> 
+              <div className="speed-controls">
+                <div title='Select a new issue'><Book style={{ width: '13px', height: '13px' }} onClick={() => resetAPIKey()} />:</div>
+                <select id="Magzine" name="Magzine" onChange={handleSelectChange} style={{height: '20px', width:'90%'}}>            
+                {magzines.map((magazine, index) => (
+                        <option key={index} value={magazine}>
+                            {magazine}
+                        </option>
+                    ))}
+              </select>                            
+              </div>                                                                                             
+            </div>                         
+          </div>   
+        </div>       
       </div>   
 
     </div>

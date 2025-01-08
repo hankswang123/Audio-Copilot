@@ -1,6 +1,12 @@
 import { voiceCommands } from './voice_control.js';
 import { audioScripts } from './audio_scripts.js';
 
+//realtime API supported voices options: 'alloy', 'echo', 'shimmer', 'ash', 'coral',  'sage', 'ballad', 'verse'
+export const realtime_voice = 'ash';
+
+//TTS supported voice options: 'alloy', 'echo', 'shimmer', 'ash', 'coral', 'sage',  'fable', 'onyx', 'nova'
+export const tts_voice = 'alloy';
+
 export const instructions = `System settings:
 Tool use: enabled.
 

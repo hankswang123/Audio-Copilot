@@ -20,15 +20,18 @@
   }
 
   .caption-display {
-    //display: flex;
     display: block;
-    position: fixed;
-    //position: absolute;
-    bottom: 48px;
+    position: absolute;
+    bottom: 50px;
     width: 100%;
+    min-height: 60px;
+    max-height: 200px;
+    left: 29px;
+    overflow-y: auto; 
     text-align: left;
     font-size: 4em;
-    background-color: rgba(0, 0, 0, 0.311);
+    //background-color: rgba(0, 0, 0, 0.311);
+    background-color: rgba(0, 0, 0, 0.6);
     z-index: 2000;
     color: white;
     padding: 10px;
@@ -36,10 +39,8 @@
     white-space: normal; /* Allow natural wrapping */
     overflow-wrap: break-word; /* Enable word wrapping only for long, unbreakable words */
     word-break: normal; /* Prevent unnecessary word breaking */   
-    //line-height: 1.5; /* Improve spacing between lines */
     word-spacing: -5px; /* Decrease space between words */
     letter-spacing: 0px; /* Keep letters evenly spaced */
-  //  text-align: center; /* Center-align the text */    
   }  
 
   .caption-display span {
@@ -89,6 +90,36 @@
     position: relative; /* Ensure the input box is positioned relative to this container */
     top: -3em; /* Adjust this value to move the input box higher */
   }  
+  
+  #contextMenu {
+    background: #4c4c7a;
+    color: white;
+    //background: white;
+    //color: #000;
+    border-radius: 5px;
+    padding: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+  }
+  
+  #contextMenu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  
+  #contextMenu ul li {
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  
+  #contextMenu ul li:hover {
+    background: #6262a1;
+  }  
+
+  .no-select {
+    user-select: none; /* Prevent text selection */
+  }  
 
   .top-hover-area {
     display: flex;
@@ -96,59 +127,85 @@
     top: 0;
     left: 0;
     width: 100%;
-    height: 50px; /* Adjust the height as needed */
-    z-index: 999; /* Ensure it is above other elements */
-    //pointer-events: none; /* Prevent the area from intercepting mouse events */
+    height: 20px; /* Adjust the height as needed */
+    z-index: 9999; /* Ensure it is above other elements */
+    justify-content: center; /* Horizontally center */
+  }
 
-    &:not(:hover) .button-row-top {
-      display: none;
-      //opacity: 0.2; 
-    }    
+  .arrowdown {
+      display: flex;
+      //position: relative;
+      //display: ;
+      top: 10px;
+      left: 50px;
+      align-items: center;
+      //left: auto;
+      //right: auto;
+      width: 580px;
+      height: 2px;
+      margin-top: 1px;
+      background: #aaa;
+      border-radius: 16px;
+      z-index: 1000;
+      padding: 2px;
+      cursor: pointer;
+      transition: background 0.3s ease-in-out;   
+  }
 
-    .button-row-top {
-      display: flex; 
-      //display: none; 
+  .top-floating-line {
+    position: absolute;
+    top: 1px;               /* 固定在父元素的顶部 */
+    left: 50%;            /* 水平偏移50% */
+    transform: translateX(-50%); /* 调整自身位置以实现水平居中 */   
+
+    width: 580px;
+    height: 2px;
+    margin-top: 1px;
+    background: #aaa;
+    border-radius: 16px;
+    z-index: 1000;
+    padding: 2px;
+    cursor: pointer;
+    transition: background 0.3s ease-in-out;    
+}  
+
+  .magzine-title {
+    font: 700 27px / 1.067 serif;
+    font-family: Poppins, Roboto, sans-serif;
+    letter-spacing: -.05em;
+    color: blueviolet;
+    //color: var(--g1-itxt-color);
+    text-transform: none;     
+  }
+
+  .top-hover-area:not(:hover) .button-row-top {
+      opacity: 0;
+      pointer-events: none; /* Prevent interaction when hidden */
+      transition: opacity 1.0s ease-in-out;
+  }
+
+  .top-hover-area .button-row-top {
+      display: flex;
       flex-grow: 1;
       margin-left: 0px; /* Adjust this value as needed */
-      //gap: 16px; /* Space between buttons */
       gap: 0.1em; /* Space between buttons */
-      align-items: center; /* Align items vertically in the center */    
+      align-items: center; /* Align items vertically in the center */
       position: fixed;
-      //position: absolute;
       top: 0; /* Adjust this value to position the button row at the top */
       width: 100%; /* Make it span the full width of the viewport */
       max-width: 100%;
       box-sizing: border-box;
-      overflow: hidden; 
+      overflow: hidden;
       background-color: white; /* Optional: Set a background color to make it stand out */
       z-index: 1000; /* Ensure it appears above other content */
-      //padding: 3px; /* Optional: Add some padding */
       padding: 0.4em; /* Optional: Add some padding */
-      //padding-left: 0px; /* Ensure no padding on the left */
-      //box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
-      //box-shadow: 0 -0.125em 0.3125em rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Adjust the values as needed */
       border-radius: 16px;
-      //margin: 1px;
-      opacity: 1;      
-    }       
-  }  
-/*
-  .top-hover-area:hover + .button-row-top {
-    display: flex; 
+      opacity: 1;
+      transition: opacity 0.3s ease-in-out;
   }
 
-  .top-hover-area:hover {
-    .button-row-top {
-      display: flex;
-    }    
-  }*/
-  
-
-
   .content-api-key {
-    //visibility: hidden;
-    //visibility:visible;
     display: flex;
     justify-content: flex-end;      
     margin-left: auto;
@@ -156,12 +213,11 @@
   }    
 
   .right-buttons {
-    //visibility: hidden;
-    //visibility:visible;
     display: flex;
     justify-content: flex-end;      
     margin-left: auto;
     margin-right: 0px;
+    box-sizing: border-box;
   }   
 
   .button-row {
@@ -176,9 +232,9 @@
     width: 100%; /* Make it span the full width of the viewport */
     max-width: 100%;
     box-sizing: border-box;
-    overflow: hidden;     
+    //overflow: hidden;     
     background-color: white; /* Optional: Set a background color to make it stand out */
-    z-index: 9999; /* Ensure it appears above other content */
+    z-index: 1000; /* Ensure it appears above other content */
     //padding: 3px; /* Optional: Add some padding */
     padding: 0.5em; /* Optional: Add some padding */
     //box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add a shadow for better visibility */
@@ -207,8 +263,6 @@
   }  
 
   .content-caption {
-    //visibility: hidden;
-    //visibility:visible;
     display: flex;
     justify-content: flex-start;      
     margin-left: 0 !important;
@@ -229,6 +283,70 @@
     z-index: 9997; /* Ensure it is above other elements */
   }  
 
+  .floating-open-button {
+    position: fixed;
+    top: 50px;
+    left: 10px;
+    //background-color: #007bff; /* Button background color */
+    //color: white; /* Button text color */
+    border: none;
+    //border: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 9995; /* Ensure it is above other elements */
+  }   
+
+  .floating-keywords {
+    position: fixed;
+    top: 60px;
+    left: 0px;
+    font-size: larger;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    padding: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    list-style-type: none;
+    max-height: 600px;
+    overflow-y: auto;
+    z-index: 9990; /* Ensure it is above other elements */
+  }
+  .floating-keywords li {
+      margin-bottom: 5px;
+      cursor: pointer;
+      //transition: background-color 0.1s;
+  }
+  .floating-keywords li:hover {
+      background-color: #e0e0e0;
+  }  
+
+  .floating-captionsize {
+    position: fixed;
+    bottom: 37px;
+    left: 3px;
+    font-size: small;
+    //background-color: #f9f9f9;
+    background-color: rgba(0, 0, 0, 0.311);
+    border: 1px solid #ddd;
+    border-radius: 5px; 
+    padding: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    list-style-type: none;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 9998; /* Ensure it is above other elements */
+  }
+  .floating-captionsize li {
+      margin-bottom: 1px;
+      cursor: pointer;
+      //transition: background-color 0.1s;
+  }
+  .floating-captionsize li:hover {
+      background-color: #e0e0e0;
+  }    
+
   .floating-right-arrow {
     position: fixed;
     bottom: 400px; /* Adjust as needed */
@@ -242,6 +360,12 @@
     cursor: pointer;
     z-index: 9999; /* Ensure it is above other elements */
   }    
+
+  .separator {
+    //margin: 0 10px; /* Add some horizontal margin to separators */
+    color: #ccc; /* Color of the separator */
+    font-weight: bold; /* Make the separator bolder */
+  }  
 
   .splitter {
     width: 4px;
@@ -258,7 +382,8 @@
     display: flex;
     justify-content: flex-start;
     gap: 0.5em; /* Adjust as needed */
-    width: 40%;
+    //width: 40%;
+    width: 100%;
     margin-top: 0.2em; /* Adjust as needed */
   }
   
@@ -269,6 +394,16 @@
     border-radius: 5px;
     cursor: pointer;
     text-align: center;
+    //text-align: left;
+    width: auto;
+
+    transition: font-size 0.3s ease, transform 0.3s ease;
+    transform-origin: bottom; /* Ensure scaling happens from the bottom */    
+  }
+
+  .speed-control:hover {
+    font-size: 1.2em;
+    transform: scaleY(1.2); /* Scale the height upwards */
   }
 
   .captionFont {
@@ -526,33 +661,31 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);  
   }  
 
-  /* Close button styling */
-    .close-button {
-      position: absolute;
-      top: 0px;
-      right: 0px;
-      background: #aaa;
-      color: #fff;
-      display: flex;
-      border-radius: 16px;
-      padding: 2px;
-      cursor: pointer;
-      &:hover {
-        background: #696969;
-      }
-      svg {
-        stroke-width: 3;
-        width: 12px;
-        height: 12px;
-      }
-    }  
-
-  .close-button-right {
+  .close-button-keywords {
     position: absolute;
-    z-index: 9999;
-    margin-top: 50px;
     top: 0px;
-    right: 10px;
+    right: 0px;
+    background: #aaa;
+    color: #fff;
+    display: flex;
+    border-radius: 16px;
+    padding: 2px;
+    cursor: pointer;
+    &:hover {
+      background: #696969;
+    }
+    svg {
+      stroke-width: 3;
+      width: 12px;
+      height: 12px;
+    }
+  }    
+
+  /* Close button styling */
+  .close-button {
+    position: absolute;
+    top: 0px;
+    right: 0px;
     background: #aaa;
     color: #fff;
     display: flex;
@@ -569,51 +702,90 @@
     }
   }  
 
-  .close-icon-right {
-    position: absolute;
-    z-index: 9999;
-    margin-top: 50px;
-    top: 40%;;
-    right: 10px;
-    //background: #aaa;
-    background: lightgray;
-    color: #fff;
-    display: flex;
-    border-radius: 16px;
-    padding: 2px;
-    cursor: pointer;
-    &:hover {
-      background: #696969;
-    }
-    svg {
-      stroke-width: 3;
-      width: 12px;
-      height: 12px;
-    }
-  }    
+.close-icon-right {
+  position: absolute;
+  z-index: 9990;
+  margin-top: 50px;
+  top: 40%;;
+  right: 10px;
+  //background: #aaa;
+  background: lightgray;
+  color: #fff;
+  display: flex;
+  border-radius: 16px;
+  padding: 2px;
+  cursor: pointer;
+  &:hover {
+    background: #696969;
+  }
+  svg {
+    stroke-width: 3;
+    width: 12px;
+    height: 12px;
+  }
+}    
 
-  .close-icon-left {
-    position: absolute;
-    z-index: 9990;
-    margin-top: 50px;
-    top: 40%;;
-    right: 400px;
-    //background: #aaa;
-    background: lightgray;
-    color: #fff;
-    display: flex;
-    border-radius: 16px;
-    padding: 2px;
-    cursor: pointer;
-    &:hover {
-      background: #696969;
-    }
-    svg {
-      stroke-width: 3;
-      width: 12px;
-      height: 12px;
-    }
-  }    
+.close-icon-left {
+  position: absolute;
+  z-index: 1;
+  margin-top: 50px;
+  top: 40%;;
+  right: 400px;
+  //background: #aaa;
+  background: lightgray;
+  color: #fff;
+  display: flex;
+  border-radius: 16px;
+  padding: 2px;
+  cursor: pointer;
+  &:hover {
+    background: #696969;
+  }
+  svg {
+    stroke-width: 3;
+    width: 12px;
+    height: 12px;
+  }
+}    
+
+.button-container {
+  position: relative;
+  display: inline-block;
+  z-index: 1;
+}
+
+.tooltip1 {
+  visibility: hidden;
+  background-color: black;
+  color: #fff;
+  text-align: center;
+  border-radius: 5px;
+  padding: 5px 10px;
+  position: absolute;
+  z-index: 1;
+  left: -160px; /* Adjust this value based on tooltip width */
+  bottom: 50%;
+  transform: translateY(50%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tooltip1::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 100%; /* Position the arrow at the right edge of the tooltip */
+  margin-top: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent transparent transparent black;
+}
+
+.button-container:hover .tooltip1 {
+    visibility: visible;
+    opacity: 1;
+}
+
 
   .tooltip {
     visibility: hidden;
@@ -633,6 +805,7 @@
     opacity: 0;
     transition: opacity 0.3s;
     width: 250px;
+    max-height: 500px;
     //z-index: 5001;
     z-index: 9999;
   }  
@@ -651,6 +824,7 @@
     border-width: 6px; /* Size of the arrow */
     border-style: solid;
     border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent; /* Arrow color */
+    //border-color:  transparent  transparent rgba(0, 0, 0, 0.85)  transparent ; /* Arrow color */
   }  
 
   .tooltip-container {
@@ -664,9 +838,113 @@
     opacity: 1;
   }  
 
+  .setting {
+    visibility: hidden;
+    background-color: white;
+    color: black;
+    text-align: center;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #333; /* Adds a subtle border */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Adds a shadow for depth */
+    position: absolute;    
+    bottom: 100%; /* Position above the button */
+    right: 50%;
+    transform: translateX(5%);
+    margin-bottom: 10px;
+    //opacity: 1;
+    opacity: 0;
+    //transition: opacity 0.3s;
+    transition: opacity 2s, visibility 0s 2s; /* Transition opacity over 3s, delay visibility change */
+    width: 300px;
+    height: 300px;
+    z-index: 9999;
+  }  
+
+  .setting-title {
+    font-size: 1.2em; /* Make title slightly larger */
+    font-weight: bold; /* Emphasize the title */
+  }  
+
+  .setting::after {
+    content: '';
+    position: absolute;
+    top: 100%; /* Position at the bottom of the tooltip */
+    right: 1px;
+    transform: translateX(-50%);
+    border-width: 6px; /* Size of the arrow */
+    border-style: solid;
+    border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent; /* Arrow color */
+  }  
+
+  .setting-container {
+    position: relative;
+    display: inline-block;
+    z-index: 9999;
+  }  
+
+  .setting-container:hover .setting {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 0.3s; /* Ensure quick fade-in */
+  }    
+
+  .setting-container .setting {
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 1s, visibility 0s 1s; /* Transition opacity over 0.3s, delay visibility change */
+  }  
+
+  .captionsize {
+    visibility: hidden;
+    //background-color: #333;
+    background-color: black;
+    color: #fff;
+    text-align: center;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #333; /* Adds a subtle border */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Adds a shadow for depth */
+    position: absolute;    
+    bottom: 100%; /* Position above the button */
+    //right: 50%;
+    left: 50%;
+    transform: translateX(-5%);
+    margin-bottom: 10px;
+    opacity: 1;
+    transition: opacity 0.3s;
+    width: 250px;
+    //height: 300px;
+    z-index: 9999;
+  }  
+
+  .captionsize::after {
+    content: '';
+    position: absolute;
+    top: 100%; /* Position at the bottom of the tooltip */
+    //right: 1px;
+    left: 13px;
+    transform: translateX(-50%);
+    border-width: 6px; /* Size of the arrow */
+    border-style: solid;
+    border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent; /* Arrow color */
+  }  
+
+  .captionsize-container {
+    position: relative;
+    display: inline-block;
+    z-index: 9999;
+  }  
+
+  .captionsize-container:hover .captionsize {
+    visibility: visible;
+    opacity: 1;
+  }      
+
+/*
   .tooltip-container:hover .close-icon-right {
     background: #696969;
-  }   
+  }  */ 
 
   .video {
         display: none;

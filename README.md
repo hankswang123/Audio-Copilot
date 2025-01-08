@@ -5,8 +5,6 @@ Audio Copilot enables the interaction with content during playback on-going. It 
 - Logic to generate new Assistant ID when the existing assistant expires
 - Test [WebRTC API Integration](https://platform.openai.com/docs/guides/realtime-webrtc)
 - Model settings, e.g. voice to be used, before launching a conversation
-- Repeat the audio by each Caption level
-- Video List to show three videos(currently only one video is displayed)
 - Launch two realtime api instants to talk with each other to implment the NotebookLM audio overview effect
 - Test more features of different models in OpenAI
 
@@ -30,3 +28,4 @@ This idea is implemented based on [OpenAI Realtime Console](https://github.com/o
 ## Issues solved
 - put 'fnm env --use-on-cd | Out-String | Invoke-Expression' to 'C:\Users\<YourUsername>\Documents\WindowsPowerShell\profile.ps1' to avoid run this command each time before 'npm start'
 - install 'concurrently' as dependency to start the 'server.js' and react app(react-scripts start) are started together
+- `RealtimeClient.updateSession({ modalities: ['text', 'voice'] });` will lead to other setting not working, e.g. voice, function calling
