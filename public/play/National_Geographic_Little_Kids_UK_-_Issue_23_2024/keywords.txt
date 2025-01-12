@@ -1,0 +1,13 @@
+  {
+    "Cows":[17,40,4],
+    "Orange foods":[41,60,6],
+    "Find Different":[60,70,7],
+    "Okapi":[70,116,8],
+    "Jumping spiders":[120,148,10],
+    "Spottedcats":[180,237,0],
+    "Armadillo":[240,263,0],
+    "Dinosaurs(Minmi)":[299,342,0],
+    "SriLanka":[360,423,0],
+    "Treasurehunts":[420,450,0],
+    "DolphinandMonkey":[480,504,0]
+  }
