@@ -92,9 +92,21 @@ const AssistantMessage = ({ text }: { text: string }) => {
 
   return (  
     <div className={styles.assistantMessage}>
-      <Markdown rehypePlugins={[rehypeRaw]}>{preprocessText(text)}</Markdown>
-    </div>
+	    <Markdown rehypePlugins={[rehypeRaw]}>{preprocessText(text)}</Markdown>
+    </div>    
   );
+  /* original code
+    <div className={styles.assistantMessage}>
+	    <Markdown rehypePlugins={[rehypeRaw]}>{preprocessText(text)}</Markdown>
+    </div>    
+  */
+  /* test show img in chat history list
+    <div className={styles.assistantMessage}>
+      <Markdown rehypePlugins={[rehypeRaw]}>
+        {'<img src="./wordCard/National Geographic Little Kids UK Issue 23 2024/Orange.png" style="border-radius: 9px; width: 200px; height: 200px;" />'}
+      </Markdown>
+    </div>
+  */  
 };
 
 const ReadAloudMessage = ({ text }: { text: string }) => {
@@ -318,9 +330,20 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), real
       appendMessage("read_aloud", audio_url);
     },        
 
-    updateItems(items) {
-      setItems(items); 
+    updateItems(newItems) {
+      //setItems(items); 
       //setItems((prevItems) => [...prevItems, ...items]);
+
+      setItems((prevItems) => {
+        // Create a Set of IDs for quick lookup of existing items
+        const existingIds = new Set(prevItems.map((item) => item.id));
+    
+        // Filter newItems to include only those that are not already in the state
+        const filteredNewItems = newItems.filter((item) => !existingIds.has(item.id));
+    
+        // Return the updated state by appending the filtered new items
+        return [...prevItems, ...filteredNewItems];
+      });      
     },
 
     updateItemID(updateItemID) {
@@ -334,7 +357,10 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), real
 
     chatFromExternal(userInput) {
       if (!userInput.trim()) return;
-      if(isChecked) {
+      
+      const checkBox = document.getElementById('checkBox') as HTMLInputElement;
+      //if(isChecked) {
+      if(checkBox.checked) {
       // use Realtime API to reply user input/question
         if(realtimeClient.isConnected()){
           realtimeClient.sendUserMessageContent([
@@ -463,7 +489,10 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), real
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim()) return;
-    if(isChecked) {
+
+    const checkBox = document.getElementById('checkBox') as HTMLInputElement;
+    //if(isChecked) {
+    if(checkBox.checked) {
     // use Realtime API to reply user input/question
       if(realtimeClient.isConnected()){
         realtimeClient.sendUserMessageContent([
@@ -644,9 +673,11 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), real
               //onClick={toggleMuteRecording}
             /> 
         <input
+          id='checkBox'
           type="checkbox"
-          title={isChecked ? "Real-time Voice Reply" : "Assistant Reply"}
-          checked={isChecked}
+          title={ realtimeClient.isConnected() ? (isChecked ? "Real-time Voice Reply" : "Assistant Reply") : 'Assistant Reply'}
+          checked={realtimeClient.isConnected()? isChecked : false}
+          disabled={!(realtimeClient.isConnected())}
           onChange={handleCheckboxChange}
           //style={{position: 'absolute', top: '5%', left: '97%', transform: 'translate(-50%, -50%)', zIndex: 1}}
         />
