@@ -36,6 +36,7 @@ import PdfViewerWithIcons from '../components/pdf/PdfViewerWithIcons';
 import { Button } from '../components/button/Button';
 import SessionControls from "../components/webrtc/SessionControls";
 import { ModuleResolutionKind } from 'typescript';
+import { OpenAI } from "openai";
 
 /**
  * Type for all event logs
@@ -179,6 +180,8 @@ export function ConsolePage() {
   const instructions = useRef(newInstructions);   
 
   const [newMagzine, setNewMagzine] = useState(`${magzines[0].replace(/[_-]/g, " ")}`);
+
+ // const [imgURL, setImgURL] = useState('');
 
   // Initialize the keywords with the first magazine
   useEffect(() => {
@@ -513,7 +516,7 @@ export function ConsolePage() {
         client.sendUserMessageContent([
         {
           type: `input_text`,
-          text: `Hello, I want to talk about ${input}`,
+          text: `Hello, I want to talk about '${input}'`,
         },
       ]);  
 
@@ -888,7 +891,8 @@ export function ConsolePage() {
     } 
   };     
 
-  const btnClickFromCM = async () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     const menuInput = document.getElementById('menuInput') as HTMLInputElement | null;
     if(menuInput && menuInput.value.trim()){ 
       chatRef.current.chatFromExternal(menuInput.value.trim());
@@ -1332,6 +1336,49 @@ export function ConsolePage() {
     }   
   };
 
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  let imgURLCache = [];
+  const hasKey = (key) => imgURLCache.some(obj => obj.hasOwnProperty(key));
+  const getValueByKey = (key) => {
+    const obj = imgURLCache.find(obj => obj.hasOwnProperty(key));
+    return obj ? obj[key] : undefined;
+  };
+  const addKeyValuePair = (key, value) => {
+    const newObj = {};
+    newObj[key] = value;
+    imgURLCache.push(newObj);
+  };
+
+  const explainAndShowImage = async (word) => {
+    openChatbot();
+    clientRef.current.updateSession({instructions: `Provide Chinese meaning, part of speech and English phonetic transcription two usage examples in English with also their chinese translation for the given word`});              
+    chatRef.current.chatFromExternal(`'${word}'`);
+    await sleep(1500);    
+    clientRef.current.updateSession({ instructions: instructions.current }); 
+
+    let imgURL = localStorage.getItem(`tmp::${word}`);
+    if(imgURL !== null && imgURL.length > 0){
+      if(imgURL.includes(' ')){
+        await chatRef.current.updateVideo(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
+      }else{
+        //await chatRef.current.updateVideo(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
+        await chatRef.current.updateVideo(`![Image Could not be loaded](${imgURL})`);      
+      } 
+      return;     
+    }
+
+    const response: Response = await fetch(`http://localhost:3001/api/image_gen?magzine=${encodeURIComponent(newMagzine)}&word=${(word)}`);    
+    imgURL = await response.json();
+    localStorage.setItem(`tmp::${word}`, imgURL);
+    if(imgURL.includes(' ')){
+      await chatRef.current.updateVideo(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
+    }else{
+      await chatRef.current.updateVideo(`![Image Could not be loaded](${imgURL}?t=${Date.now()})`);
+    }    
+    
+  }
+
   const handleMouseUp = (e: MouseEvent) => {
     setIsDragging(false);
     setIsProgressDragging(false);
@@ -1339,9 +1386,8 @@ export function ConsolePage() {
 
     document.body.style.userSelect = 'auto'; // Restore text selection
     //document.body.classList.remove('no-select'); // Remove no-select class after dragging
-
+    const menu = document.getElementById("contextMenu");
     const selectedText = window.getSelection().toString().trim();
-
     //Max length supported by OpenAI API is 4096 for TTS model
     if(selectedText.length >= 4096){ return; }
   
@@ -1353,7 +1399,6 @@ export function ConsolePage() {
         clearTimeout(popupTimeout);
       }
 
-      const menu = document.getElementById("contextMenu");
       if (!menu.contains(e.target as Node)) {
         hideContextMenu();
       }      
@@ -1367,19 +1412,49 @@ export function ConsolePage() {
     }
 
     if (selectedText && isConnectedRef.current) {
-      //Read Aloud popup is replaced by the context menu
-      //showPopup(e.clientX, e.clientY, selectedText);
 
       const selection = window.getSelection();
-      //prompt(selection.toString());
-      //const selrange = selection.getRangeAt(0);      
-      //prompt(selrange.toString());      
       const range = selection.getRangeAt(0).getBoundingClientRect();
+
+      menu.style.display = "block";
+      const computedStyle = window.getComputedStyle(menu);
+      const menuHeight = computedStyle.height;
+      menu.style.display = "none";
+
+      const y = range.top + window.scrollY + 30 + parseFloat(menuHeight) < window.innerHeight ? range.top + window.scrollY + 30 : range.top + window.scrollY - 30 - parseFloat(menuHeight);
       const x = range.left + window.scrollX;
-      const y = range.top + window.scrollY + 30;
+
+      const wordCardLi = document.getElementById('wordCardLi');  
+      const readAloudLi = document.getElementById('readAloudLi');  
+      const explainLi = document.getElementById('explainLi');
+      if( selectedText.includes(' ') || selectedText.includes('\n') || selectedText.length>15 )  
+      {// Not likely a single WORD selected, hide the wordCard
+        wordCardLi.style.display = 'none';        
+        readAloudLi.style.display = 'block';
+        explainLi.style.display = 'block';
+      }else{
+        wordCardLi.style.display = 'block';
+        readAloudLi.style.display = 'none';        
+        explainLi.style.display = 'none';    
+        wordCardLi.onclick = async () => {
+          try{
+
+            explainAndShowImage(selectedText);
+            
+          }catch(error){
+            console.error('Error generating image:', error);
+          }           
+        };
+      }
       
-      const readAloudLi = document.getElementById('readAloudLi');
-      readAloudLi.onclick = () => selectionTTS(selectedText);
+      //readAloudLi.onclick = () => selectionTTS(selectedText);
+      if(readAloudLi.style.display === 'block'){
+        readAloudLi.onclick = () => {chatRef.current.chatFromExternal(`Read Aloud about '${selectedText}' and explain to me its chinese meaning and provide to two usage examples in English.`);};
+      }
+      
+      if(explainLi.style.display === 'block'){
+        explainLi.onclick = () => {chatRef.current.chatFromExternal(`Explain '${selectedText}'`);};
+      }
 
       const searchVideosLi = document.getElementById('searchVideosLi');
       searchVideosLi.onclick = () => {chatRef.current.chatFromExternal(`Search videos about '${selectedText}'`);};
@@ -1959,6 +2034,7 @@ export function ConsolePage() {
     setRealtimeEvents(realtimeEvents);
     setItems(client.conversation.getItems());
     setItems(items);
+    //await chatRef.current.updateItems(items);
     await chatRef.current.updateItems(client.conversation.getItems());
 
 
@@ -2313,6 +2389,11 @@ export function ConsolePage() {
         }        
 
         await showVideofromYoutube(query);
+
+        if(!isMuteBtnDisabled && !isMuted){
+          muteBtnRef.current.click();
+        }        
+
       }
     );        
     // Voice control the on-going playback
@@ -2715,7 +2796,7 @@ export function ConsolePage() {
    */
   const disConnnectRealtimeAPI = async () => {
     disconnectConversation();
-    closeRightArrowNew();
+    //closeRightArrowNew();
   }
 
   /**
@@ -2752,6 +2833,34 @@ export function ConsolePage() {
     }
   };
 
+  let wordCardTimeout = null; // Global timeout variable to track dismissal  
+  function showWordCard(x, y, imgURL) {  
+
+    hideContextMenu(); // Hide the context menu    
+
+    const wordCard = document.getElementById("wordCard");
+    wordCard.style.left = `${x}px`;
+    wordCard.style.top = `${y}px`;
+    wordCard.style.display = "block";
+    //wordCard.style.display = "flex";
+    wordCard.style.zIndex = "9999";
+
+    //const wordCardImg = document.getElementById("wordCardImg");
+    //(wordCardImg as HTMLImageElement).src = imgURL;
+
+    // Attach mouse leave event to manage timeout
+    wordCard.onmouseleave = () => {
+      wordCardTimeout = setTimeout(() => {
+        wordCard.style.display = "none";
+      }, 1000); // 3-second delay
+    };
+
+    // Clear the timeout if the mouse re-enters
+    wordCard.onmouseenter = () => {
+        clearTimeout(wordCardTimeout);
+      };        
+  }  
+
   let menuTimeout = null; // Global timeout variable to track dismissal  
   function showContextMenu(x, y) {
     const menu = document.getElementById("contextMenu");
@@ -2773,6 +2882,12 @@ export function ConsolePage() {
 
   }
   
+  function hideWordCard() {
+    const wordCard = document.getElementById("wordCard");
+
+    wordCard.style.display = "none";
+  }    
+
   function hideContextMenu() {
     const menu = document.getElementById("contextMenu");
     const menuInput = document.getElementById('menuInput');   
@@ -2780,22 +2895,7 @@ export function ConsolePage() {
     (menuInput as HTMLInputElement).value = '';
     menu.style.display = "none";
   }  
-
-  function handleAction(action) {
-    const selectedText = window.getSelection().toString();
-  
-    if (action === "whatIsThis") {
-      alert(`Searching for: ${selectedText}`);
-    } else if (action === "seePicture") {
-      alert(`Displaying pictures for: ${selectedText}`);
-    } else if (action === "searchWeb") {
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(selectedText)}`);
-    } else if (action === "ask") {
-      alert(`Asking about: ${selectedText}`);
-    }
-  
-    hideContextMenu(); // 操作完成后隐藏菜单
-  }  
+ 
 
   useEffect(() => {
     // Set up the interval to check the connection every 5 seconds
@@ -2830,14 +2930,26 @@ export function ConsolePage() {
         </div>
       </div>
 
+      {/* wordCard when text selected  */}  
+      <div id='wordCard' style={{position: 'absolute', display: 'none'}}>
+       {/* <img id='wordCardImg' src={imgURL} alt='Word Card' style={{width: '200px', height: '200px'}}></img> */} 
+      </div>
+
       {/* ContextMenu when text selected  */}   
       <div id="contextMenu" style={{position: 'absolute', display: 'none'}}>
         <ul>
+          <li id='wordCardLi'>Word Card</li>
           <li id='readAloudLi'>Read Aloud</li>
+          <li id='explainLi'>Explain</li>
           <li id='searchVideosLi'>Search Videos</li>
           <li style={{display: 'none'}}>Search the web</li>
           <li id='talkAboutSelection'>Have a talk</li>
-          <li><input id='menuInput' placeholder="Ask Anything..." style={{marginRight: '5px'}}></input><button onClick={btnClickFromCM}>Ask</button></li>
+          <li>
+            <form onSubmit={handleSubmit}>
+              <input id='menuInput' placeholder="Ask Anything..." style={{marginRight: '5px'}}></input>
+              <button type='submit'>Ask</button>             
+            </form>
+          </li>
         </ul>
       </div>
 
@@ -2935,7 +3047,7 @@ export function ConsolePage() {
           <div title={isTwoPageView ? 'Single Page View' : 'Two Page View'} style={{display: 'none'}}>
             <Layout style={{ width: '20px', height: '20px', marginLeft: '2px', cursor: 'pointer' }} onClick={togglePageView}/>
           </div>               
-          <div className='magzine-title' style={{height: '25px', justifyContent: 'center', marginLeft: 'auto', marginRight: 'auto', userSelect: 'none'}}><img src='./resource/ngl.png' width="70px" height="20px" style={{marginRight: "5px"}}></img>{newMagzine}
+          <div className='magzine-title' style={{height: '25px', justifyContent: 'center', marginLeft: 'auto', marginRight: 'auto', userSelect: 'none'}}><img id='imgRecraft' src='./resource/ngl.png' width="70px" height="20px" style={{marginRight: "5px"}}></img>{newMagzine}
           </div>                    
           <Button
             style={{height: '10px', display: 'none'}}
@@ -3063,7 +3175,7 @@ export function ConsolePage() {
                         renderAnnotationLayer={false}
                         onLoadSuccess={() => onPageLoadSuccess({ pageNumber })}
                         loading={<p>Loading page {pageNumber}...</p>}
-                        width={isTwoPageView ? 400 : 800} // 调整页面宽度
+                        width={isTwoPageView ? 430 : 860} // 调整页面宽度
                       />
                     </div>
                   ))}
@@ -3077,7 +3189,7 @@ export function ConsolePage() {
         {/* Splitter Area */}
         {/* Open(Left Arrow<-) or Close((Right Arrow->)) Right Panel */}
         <div className="button-container">
-          <div id="openRightArrow" className="close-icon-right" onClick={openChatbot} style={{display: (isConnected? "flex": "none")}}><ArrowLeft style={{ width: '18px', height: '18px' }} /></div>
+          <div id="openRightArrow" className="close-icon-right" onClick={openChatbot} style={{display: (isConnected? "flex": "flex")}}><ArrowLeft style={{ width: '18px', height: '18px' }} /></div>
           <div className="tooltip1"><span>Open Chatbot</span></div>
         </div>
         <div  id="closeRightArrow" className="close-icon-left" onClick={closeRightArrowNew} style={{display: "none"}}><ArrowRight style={{ width: '18px', height: '18px' }} /></div>
