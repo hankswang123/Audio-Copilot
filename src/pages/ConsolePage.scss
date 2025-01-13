@@ -30,11 +30,11 @@
     overflow-y: auto; 
     text-align: left;
     font-size: 4em;
-    //background-color: rgba(0, 0, 0, 0.311);
     background-color: rgba(0, 0, 0, 0.6);
     z-index: 2000;
     color: white;
     padding: 10px;
+    margin-left: -1.3px;
     border-radius: 5px; 
     white-space: normal; /* Allow natural wrapping */
     overflow-wrap: break-word; /* Enable word wrapping only for long, unbreakable words */
@@ -94,8 +94,6 @@
   #contextMenu {
     background: #4c4c7a;
     color: white;
-    //background: white;
-    //color: #000;
     border-radius: 5px;
     padding: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
@@ -115,6 +113,38 @@
   
   #contextMenu ul li:hover {
     background: #6262a1;
+  }  
+
+  #floatingKeywords li:hover {
+    background: #6262a1;
+  }    
+
+  
+  //.hover-effect {
+  //  transition: background-color 0.3s ease; /* Optional: Add transition for smooth effect */
+  //}
+  
+  //.hover-effect:hover {
+    //background-color: #6262a1; /* Change to your desired hover background color */
+    //background-color: red; /* Change to your desired hover background color */
+  //}  
+
+  .hover-effect {
+    background-color: #fff; /* Default background color */
+    color: #000; /* Default text color */
+    //transition: background-color 0.3s ease; /* Optional: Smooth transition */
+  }
+  
+  .hover-effect:hover {
+    //background-color: red; /* Hover background color */
+    //background-color: #6262a1;
+    background-color: #66666698;
+    color: #fff; /* Optional: Hover text color */
+  }
+  
+  .hover-effect.active {
+    background-color: #666; /* Active background color */
+    color: #fff; /* Active text color */
   }  
 
   .no-select {
@@ -303,6 +333,7 @@
     top: 60px;
     left: 0px;
     font-size: larger;
+    list-style: none;
     background-color: #f9f9f9;
     border-radius: 8px;
     border: 1px solid #ddd;
@@ -789,7 +820,6 @@
 
   .tooltip {
     visibility: hidden;
-    //background-color: #333;
     background-color: rgba(0, 0, 0, 0.85);
     color: #fff;
     text-align: center;
@@ -806,7 +836,6 @@
     transition: opacity 0.3s;
     width: 250px;
     max-height: 500px;
-    //z-index: 5001;
     z-index: 9999;
   }  
 
@@ -824,7 +853,6 @@
     border-width: 6px; /* Size of the arrow */
     border-style: solid;
     border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent; /* Arrow color */
-    //border-color:  transparent  transparent rgba(0, 0, 0, 0.85)  transparent ; /* Arrow color */
   }  
 
   .tooltip-container {

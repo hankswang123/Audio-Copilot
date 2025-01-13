@@ -1571,7 +1571,8 @@ export function ConsolePage() {
       // Close the popup and stop the video
       closeKeywords.addEventListener('click', () => {
         floatingKeywords.style.display = 'none';
-        openKeywords.style.display = 'flex';
+        //openKeywords.style.display = 'flex';
+        openKeywords.style.display = 'none';
         });
 
         openKeywords.addEventListener('click', () => {
@@ -2953,7 +2954,8 @@ export function ConsolePage() {
         </ul>
       </div>
 
-      <div id="openKeywords" className="floating-open-button" onClick={openKeywords} style={{display: 'flex'}} title='Selec a Keyword to dive in'><BookOpen style={{ width: '18px', height: '18px' }} /></div>
+      {/* Hide openKeywords due to bottom keywords popup control */}
+      <div id="openKeywords" className="floating-open-button" onClick={openKeywords} style={{display: 'none'}} title='Selec a Keyword to dive in'><BookOpen style={{ width: '18px', height: '18px' }} /></div>
       {/* Click keyword to go to specific page and seek the current time */}
       <ul id="floatingKeywords" className="floating-keywords" style={{display: 'none'}}> 
         <span id="closeKeywords" className="close-button-keywords"><X /></span>
@@ -2961,9 +2963,10 @@ export function ConsolePage() {
         {Object.entries(Keywords.current as Record<string, [number, number, number]>).map(([key, [value1, value2, value3]], index) => value3 !== 0 && (
           <li
             key={index} // Use index as the key for React
+            className={`hover-effect ${keyword === key ? 'active' : ''}`}
             style={{
-              backgroundColor: keyword === key ? '#666' : '#f9f9f9', // Darker if active
-              color: keyword === key ? '#fff' : '#000', // Adjust text color for contrast
+              //backgroundColor: keyword === key ? '#666' : '#f9f9f9', // Darker if active
+              //color: keyword === key ? '#fff' : '#000', // Adjust text color for contrast
               borderRadius: '0.3125em',
               whiteSpace: 'nowrap',
             }}
@@ -3418,28 +3421,26 @@ export function ConsolePage() {
             <div><span className="separator">|</span></div>
             <div className="tooltip-container" style={{userSelect: 'none'}}>
               <div title={keyword === '' ? 'Select a Keyword to Dive in' : '' }><BookOpen style={{ width: '17px', height: '17px' }} /></div>
-              <div className="tooltip" style={{backgroundColor: 'rgb(255, 255, 255, 1)', width: 'auto', height: 'auto', paddingRight: '10px' }}>
-                <ul> 
+              <div className="tooltip" style={{backgroundColor: 'rgb(255, 255, 255, 1)', width: 'auto', height: 'auto'}}>
+                <ul style={{listStyle: 'none', marginLeft:'10px', textAlign: 'left', padding: '0px'}}> 
                   {Object.entries(Keywords.current as Record<string, [number, number, number]>).map(([key, [value1, value2, value3]], index) => value3 !== 0 && (
                     <li
                       key={index} // Use index as the key for React
+                      className={`hover-effect ${keyword === key ? 'active' : ''}`}
                       style={{
-                        backgroundColor: keyword === key ? '#666' : '#f9f9f9', // Darker if active
-                        color: keyword === key ? '#fff' : '#000', // Adjust text color for contrast
                         borderRadius: '0.3125em',
                         whiteSpace: 'nowrap',
                         textAlign: 'left',
                         cursor: 'pointer',
                         marginRight: '20px',
+                        marginLeft: '10px',
                       }}
                       onClick={(e) => loopKeywordPlay(e, key, value1, value2, value3)} // Loop play the keyword segment
                     >
-                      {/*{index+1}.{key}  Display the key */}
                       {index+1}.{key}
                     </li>
                   ))}
                 </ul>
-
               </div> 
             </div>
             <div className="speed-control"         style={{
