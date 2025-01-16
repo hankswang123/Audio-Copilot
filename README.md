@@ -2,6 +2,8 @@
 Audio Copilot enables the interaction with content during playback on-going. It will help transform the passive listening into an interactive, engaging and real-time experience. It can understand the on-going playback intelligently and be ready for user’s query at any time. 
 
 ## Features/Tests TBD
+- Functions in context menu, e.g. Read Aloud and Explain, needs Voice Reply by default regards of CheckBox setting
+- Check how to integrate some OpenAI compatiable Free Models API
 - Logic to generate new Assistant ID when the existing assistant expires
 - Test [WebRTC API Integration](https://platform.openai.com/docs/guides/realtime-webrtc)
 - Model settings, e.g. voice to be used, before launching a conversation
