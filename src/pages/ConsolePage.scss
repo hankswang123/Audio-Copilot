@@ -64,13 +64,13 @@
 
   .audio-duration {
     position: absolute;
-    top: -2em; /* Adjust as needed */
+    top: -1.85em; /* Adjust as needed */
     right: 0;
     background-color: white;
     color:  rgba(0, 0, 0, 0.7);
     padding: 0.3125em;
     border-radius: 0.3125em;
-    font-size: 0.9em;
+    font-size: 0.8em;
   }  
 
   .input-box {
@@ -399,7 +399,7 @@
   }  
 
   .splitter {
-    width: 4px;
+    width: 5px;
     background-color: lightgray;
     cursor: col-resize;
   }  
@@ -407,6 +407,7 @@
   .splitter:hover {
     //background-color: gray;
     background-color: #696969;
+    //background-color: blue;
   }
 
   .speed-controls {

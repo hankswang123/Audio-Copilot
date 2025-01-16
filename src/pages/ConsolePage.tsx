@@ -1252,6 +1252,9 @@ export function ConsolePage() {
     resizePanel(e.nativeEvent);      
     document.body.style.userSelect = 'none'; // Prevent text selection
     //document.body.classList.add('no-select'); // Add no-select class to prevent text selection
+
+    const splitter = document.getElementById('splitter');
+    splitter.style.backgroundColor = '#696969';
   };  
 
   const resizePanel = (e: MouseEvent | React.MouseEvent<HTMLDivElement>) => {
@@ -1334,6 +1337,7 @@ export function ConsolePage() {
         resizePanel(e);
       }
     }   
+    
   };
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1360,10 +1364,9 @@ export function ConsolePage() {
     let imgURL = localStorage.getItem(`tmp::${word}`);
     if(imgURL !== null && imgURL.length > 0){
       if(imgURL.includes(' ')){
-        await chatRef.current.updateVideo(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
+        await chatRef.current.updateImage(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
       }else{
-        //await chatRef.current.updateVideo(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
-        await chatRef.current.updateVideo(`![Image Could not be loaded](${imgURL})`);      
+        await chatRef.current.updateImage(`![Image Could not be loaded](${imgURL})`);      
       } 
       return;     
     }
@@ -1372,22 +1375,40 @@ export function ConsolePage() {
     imgURL = await response.json();
     localStorage.setItem(`tmp::${word}`, imgURL);
     if(imgURL.includes(' ')){
-      await chatRef.current.updateVideo(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
+      await chatRef.current.updateImage(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
     }else{
-      await chatRef.current.updateVideo(`![Image Could not be loaded](${imgURL}?t=${Date.now()})`);
+      await chatRef.current.updateImage(`![Image Could not be loaded](${imgURL}?t=${Date.now()})`);
     }    
     
   }
+
+  const getSelectedText = () => {
+    const selection = window.getSelection();
+    let selectedText = '';
+  
+    for (let i = 0; i < selection.rangeCount; i++) {
+      const range = selection.getRangeAt(i);
+      if (selectedText) {
+        selectedText += ' '; // Add a space between ranges
+      }      
+      selectedText += range.toString();
+    }
+  
+    return selectedText;
+  };  
 
   const handleMouseUp = (e: MouseEvent) => {
     setIsDragging(false);
     setIsProgressDragging(false);
     setIsSplitterDragging(false);
 
+    const splitter = document.getElementById('splitter');
+    splitter.style.backgroundColor = 'lightgray';    
+
     document.body.style.userSelect = 'auto'; // Restore text selection
     //document.body.classList.remove('no-select'); // Remove no-select class after dragging
     const menu = document.getElementById("contextMenu");
-    const selectedText = window.getSelection().toString().trim();
+    const selectedText = window.getSelection().toString().trim().replace(/\n/g, ' ');
     //Max length supported by OpenAI API is 4096 for TTS model
     if(selectedText.length >= 4096){ return; }
   
@@ -1430,7 +1451,7 @@ export function ConsolePage() {
       if( selectedText.includes(' ') || selectedText.includes('\n') || selectedText.length>15 )  
       {// Not likely a single WORD selected, hide the wordCard
         wordCardLi.style.display = 'none';        
-        readAloudLi.style.display = 'block';
+        readAloudLi.style.display = 'none';
         explainLi.style.display = 'block';
       }else{
         wordCardLi.style.display = 'block';
@@ -1447,9 +1468,11 @@ export function ConsolePage() {
         };
       }
       
+      let selectionTxt = getSelectedText().trim();
       //readAloudLi.onclick = () => selectionTTS(selectedText);
       if(readAloudLi.style.display === 'block'){
-        readAloudLi.onclick = () => {chatRef.current.chatFromExternal(`Read Aloud about '${selectedText}' and explain to me its chinese meaning and provide to two usage examples in English.`);};
+        //readAloudLi.onclick = () => {chatRef.current.chatFromExternal(`Read Aloud about '${selectedText}' and explain to me its chinese meaning and provide to two usage examples in English.`);};
+        readAloudLi.onclick = () => {chatRef.current.chatFromExternal(`Read Aloud about '${selectedText}' and explain to me its chinese meaning  and provide to two usage examples in English.`);};
       }
       
       if(explainLi.style.display === 'block'){
@@ -1763,6 +1786,8 @@ export function ConsolePage() {
     } 
     return '';
   };
+
+  const getIsMuted = () => {return isMuted;};
 
   /*
    * Utility for search Videos by Youtube by addTool
@@ -2899,8 +2924,8 @@ export function ConsolePage() {
  
 
   useEffect(() => {
-    // Set up the interval to check the connection every 5 seconds
-    const intervalId = setInterval(checkConnection, 5000);
+    // Set up the interval to check the connection every 3 seconds
+    const intervalId = setInterval(checkConnection, 3000);
 
     // Cleanup the interval on component unmount
     return () => {
@@ -2947,7 +2972,7 @@ export function ConsolePage() {
           <li id='talkAboutSelection'>Have a talk</li>
           <li>
             <form onSubmit={handleSubmit}>
-              <input id='menuInput' placeholder="Ask Anything..." style={{marginRight: '5px'}}></input>
+              <input id='menuInput' placeholder="Ask me anything..." style={{marginRight: '5px'}}></input>
               <button type='submit'>Ask</button>             
             </form>
           </li>
@@ -3207,7 +3232,7 @@ export function ConsolePage() {
 
         {/* Right Area: show the chatbot and conversation list on the right side panel */}
         <div className="content-right" ref={rightRef} style={{display: "none"}}>
-          <div id="chatContainer" style={{display: "none"}}><Chat functionCallHandler={functionCallHandlerForChat} realtimeClient={clientRef.current} ref={chatRef} /></div>
+          <div id="chatContainer" style={{display: "none"}}><Chat functionCallHandler={functionCallHandlerForChat} realtimeClient={clientRef.current} getIsMuted={getIsMuted} ref={chatRef} /></div>
 
           {/*content-main for test purpose*/}
           <div className="content-main" ref={conversationDivRef} style={{display: "none"}}>
@@ -3420,7 +3445,7 @@ export function ConsolePage() {
 
             <div><span className="separator">|</span></div>
             <div className="tooltip-container" style={{userSelect: 'none'}}>
-              <div title={keyword === '' ? 'Select a Keyword to Dive in' : '' }><BookOpen style={{ width: '17px', height: '17px' }} /></div>
+              <div title={keyword === '' ? 'Select a Keyword to Dive in' : '' }><BookOpen color='blue' style={{ width: '17px', height: '17px' }} /></div>
               <div className="tooltip" style={{backgroundColor: 'rgb(255, 255, 255, 1)', width: 'auto', height: 'auto'}}>
                 <ul style={{listStyle: 'none', marginLeft:'10px', textAlign: 'left', padding: '0px'}}> 
                   {Object.entries(Keywords.current as Record<string, [number, number, number]>).map(([key, [value1, value2, value3]], index) => value3 !== 0 && (
@@ -3498,6 +3523,7 @@ export function ConsolePage() {
               disabled={!isConnected}
               buttonStyle={'regular'}
               onClick={toggleMuteRecording}
+              className='hidden-button'
             />
           <div className="tooltip"  style={{display: isCaptionVisible && 'none'}}>
             <strong className='tooltip-title'>Turn <>{isMuted ? 'on' : 'off'}</> microphone</strong><br />
@@ -3506,12 +3532,13 @@ export function ConsolePage() {
           </div>            
         </div>   
         {/*Display Copilot Status*/}      
-        <div style={{ fontSize: '1em', userSelect: 'none' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Error Occurred!</span></> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div>      
-        
+        <div style={{ fontSize: '1em', userSelect: 'none', marginLeft: '5px' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Error Occurred!</span></> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div>      
+
+        <Zap onClick={ isConnected ? disConnnectRealtimeAPI : connnectRealtimeAPI } style={{ display: isConnected ? "none" : "flex", marginRight: "1px", marginLeft: "auto", justifyContent: "flex-end", zIndex: '9999', userSelect: 'none', cursor: "pointer" }}/>      
         {/*Settings for AI assistant and Realtime API*/} 
-        <div style={{display:"flex", marginRight: "0px", marginLeft: "auto", justifyContent: "flex-end", zIndex: '9999', userSelect: 'none' }}>    
+        <div style={{display:"flex", marginRight: "0px", marginLeft: isConnected ? "auto" : "1px", justifyContent: "flex-end", zIndex: '9999', userSelect: 'none' }}>            
           <div className="setting-container" style={{display: "flex"}}>
-            <Settings style={{ width: '20px', height: '20px', marginRight: '1px' }}/>
+            <Settings style={{ width: '20px', height: '20px',marginLeft: '1px', marginRight: '1px' }}/>
             <div className="setting">
               <strong className='setting-title'>Setting</strong><br /><br />
               {/*Settings for Voice selection of Realtime API*/} 

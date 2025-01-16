@@ -6,8 +6,9 @@ export const magzines = [
     //"National_Geographic_Little_Kids_USA_-_January-February_2024",
     //"National_Geographic_Little_Kids_UK_-_Issue_23_2024",
     //"National_Geographic_Little_Kids_USA_-_September-October_2024",
-    "National_Geographic_Little_Kids_USA_-_November-December_2024",
-    "ngl_sep_lite"
+    "Back to School, Lunchtime, and Park Colors",
+    "National_Geographic_Little_Kids_USA_-_November-December_2024"
+    //"ngl_sep_lite"
 ];
 
 // To fetch the scripts from the public folder

@@ -10,7 +10,7 @@ import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
 import { RealtimeClient } from '@openai/realtime-api-beta';
 
 import { Button } from '../button/Button';
-import { Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight } from 'react-feather';
+import { Mic, MicOff, Send, Plus, Minus, ArrowLeft, ArrowRight } from 'react-feather';
 import { openDB } from 'idb';
 //import { pdfFilePath, audioFilePath } from '../filePaths.js';
 
@@ -117,65 +117,52 @@ const ReadAloudMessage = ({ text }: { text: string }) => {
   );
 };
 
+const OriginalAudio = ({ align, itemId, items }: { align: string; itemId: string; items: ItemType[] }) => {
+  return (
+    <div style={{ alignSelf: align }} >
+      {items
+        .filter((conversationItem) => conversationItem.id === itemId) // Filter for the specific item
+        .map((conversationItem) => (          
+          <div key={conversationItem.id}>                       
+              {conversationItem.formatted.file && (() => {
+                return (
+                  <audio src={conversationItem.formatted.file.url} controls />
+                );
+              })()}               
+          </div>
+      ))}
+    </div>  
+  );
+}
+
 const AudioMessage = ({ itemId, items }: { itemId: string; items: ItemType[] }) => {
   const tempItem = items.find((conversationItem) => conversationItem.id === itemId);
 
   // Check if tempItem exists before accessing its properties
-  const alignSelf = tempItem?.role === 'user' ? 'flex-end' : 'flex-start';
+  const role = tempItem?.role;
+  const alignSelf = role === 'user' ? 'flex-end' : 'flex-start';
 
-  return (
-    <div style={{ alignSelf }}>
-      {items
-        .filter((conversationItem) => conversationItem.id === itemId) // Filter for the specific item
-        .map((conversationItem) => (          
-          <div className={`cv-item`} key={conversationItem.id}>            
-            <div className={`speaker ${conversationItem.role || ''}`} style={{ display: 'none' }}>
-              <div>
-                {(conversationItem.role || conversationItem.type).replaceAll('_', ' ')}
-              </div>
-            </div>
-            <div className={`speaker-content`}>
-              {/* Tool response */}
-              {conversationItem.type === 'function_call_output' && (
-                <div style={{ display: 'none' }}>{conversationItem.formatted.output}</div>
-              )}
-              {/* Tool call */}
-              {!!conversationItem.formatted.tool && (
-                <div style={{ display: 'none' }}>
-                  {conversationItem.formatted.tool.name}(
-                  {conversationItem.formatted.tool.arguments})
-                </div>
-              )}
-              {!conversationItem.formatted.tool &&
-                conversationItem.role === 'user' && (
-                  <div className={styles.userMessage} style={{ alignSelf: 'flex-end'}}>
-                    {conversationItem.formatted.transcript ||
-                      (conversationItem.formatted.audio?.length
-                        ? '(awaiting transcript)'
-                        : conversationItem.formatted.text || '(item sent)')}
-                    {/* Audio */}                    
-                  </div>
-                )}
-              {!conversationItem.formatted.tool &&
-                conversationItem.role === 'assistant' && (
-                  <div className={styles.assistantMessage}>
-                    {conversationItem.formatted.transcript ||
-                      conversationItem.formatted.text || '(truncated)'}
-                    {/* Audio */}                                           
-                  </div>
-                )}
-              {/* Audio */}
-              {conversationItem.formatted.file && (() => {
-                      console.log('Audio URL:', conversationItem.formatted.file.url);
-                      return (
-                        <audio src={conversationItem.formatted.file.url} controls />
-                      );
-                    })()}               
-            </div>
-          </div>
-        ))}
-    </div>
-  );
+  switch (role) {
+    case "user":
+      return <> {/*Transcription for user audio or text only*/}
+                <UserMessage text={tempItem.formatted.transcript ||
+                                (tempItem.formatted.audio?.length
+                                  ? '(awaiting transcript)'
+                                  : tempItem.formatted.text || '(item sent)')} 
+                />
+                <OriginalAudio align={alignSelf} itemId={itemId} items={items} />
+             </>    
+    case "assistant":
+      return <> {/*Transcription for system response audio*/}
+                <AssistantMessage text={tempItem.formatted.transcript ||
+                                    tempItem.formatted.text || '(truncated)'} 
+                />
+                <OriginalAudio align={alignSelf} itemId={itemId} items={items} />
+            </>  
+    default:
+      return null;
+  }      
+
 };
 
 const CodeMessage = ({ text }: { text: string }) => {
@@ -213,10 +200,11 @@ type ChatProps = {
     toolCall: RequiredActionFunctionToolCall
   ) => Promise<string>;
   realtimeClient?: RealtimeClient;
+  getIsMuted?: () => boolean;
 };
 
 //export function Chat({ functionCallHandler = () => Promise.resolve("") }: ChatProps, ref) {
-const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), realtimeClient }: ChatProps, ref) => {
+const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getIsMuted, realtimeClient }: ChatProps, ref) => {
   const [userInput, setUserInput] = useState("");
   //new codes by copilot
   const [messages, setMessages] = useState<{ role: "user" | "assistant" | "code" | "audio" | "read_aloud"; text: string }[]>([]);
@@ -321,6 +309,9 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), real
     updateVideo(embedUrl) {
       appendMessage("assistant", embedUrl);
     },  
+    updateImage(imgUrl) {
+      appendMessage("assistant", imgUrl);
+    },     
     updateSelection(selection) {
       //appendMessage("user", `<div style={fontSize: '0.2em',}>[Read Aloud]:</div><br />`+ selection);
       appendMessage("user", '[Read Aloud]:<br />'+ selection);
@@ -362,6 +353,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), real
       //if(isChecked) {
       if(checkBox.checked) {
       // use Realtime API to reply user input/question
+        //appendMessage("user", userInput);
         if(realtimeClient.isConnected()){
           realtimeClient.sendUserMessageContent([
             {
@@ -488,12 +480,19 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), real
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userInput.trim()) return;
+    if (!userInput.trim()) {
+      const muteButton = document.getElementById('muteButton');
+      if (muteButton) {
+        muteButton.click();
+      }
+      return;
+    }
 
     const checkBox = document.getElementById('checkBox') as HTMLInputElement;
     //if(isChecked) {
     if(checkBox.checked) {
     // use Realtime API to reply user input/question
+      //setMessages((prev) => [...prev, { role: "user", text: userInput }]);
       if(realtimeClient.isConnected()){
         realtimeClient.sendUserMessageContent([
           {
@@ -648,36 +647,38 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), real
           className={styles.input}
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
-          placeholder="Enter your question"
+          placeholder="Ask me anything..."
+          style={{marginRight: '1px'}}
         />  
-        <button
+        <Button
           type="submit"
           className={styles.button}
-          disabled={inputDisabled}
-          style={{ display: 'none' }}
-        >       
-          Send
-        </button>                 
+          disabled={realtimeClient.isConnected() ? false : true}
+          label={''}
+          iconPosition={'start'}
+          icon={ getIsMuted() ? MicOff : Mic}          
+          style={{ fontSize: 'medium', marginLeft: '1px', marginRight: '1px', display: userInput.trim() === '' ? 'flex' :'none' }}
+        />                        
         <Button
               type="submit"
               id="submitButton"
               className={styles.button}
-              label='Send'
+              label={''}
               iconPosition={'start'}
-              //icon= { Mic }
+              icon= { Send }
               //disabled={isMuteBtnDisabled}
-              disabled={inputDisabled}
+              disabled={realtimeClient.isConnected() ? inputDisabled : true}
               buttonStyle={'regular'}
               onFocus={() => {console.log('Mute/Unmute icon should not be displayed'); }}
-              style={{marginRight: '1px'}}
+              style={{fontSize: 'medium', marginLeft: '1px', marginRight: '1px', display: userInput.trim() === '' ? 'none' :'flex'}}
               //onClick={toggleMuteRecording}
             /> 
         <input
           id='checkBox'
           type="checkbox"
-          title={ realtimeClient.isConnected() ? (isChecked ? "Real-time Voice Reply" : "Assistant Reply") : 'Assistant Reply'}
+          title={ realtimeClient.isConnected() ? (isChecked ? "Voice & Text Reply" : "Text-Only Reply") : 'Text-Only Reply'}
           checked={realtimeClient.isConnected()? isChecked : false}
-          disabled={!(realtimeClient.isConnected())}
+          disabled={!(realtimeClient.isConnected())? true : userInput.trim() === '' ? true : false}
           onChange={handleCheckboxChange}
           //style={{position: 'absolute', top: '5%', left: '97%', transform: 'translate(-50%, -50%)', zIndex: 1}}
         />
