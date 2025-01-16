@@ -30,9 +30,9 @@
   /*Enhanced CSS  */
   display: flex;
   width: 100%;
-  padding: 6px;
+  padding: 2px;
   /*padding-bottom: 0px;  */
-  border-radius: 16px;
+  border-radius: 14px;
   order: 1;
 }
 
@@ -41,19 +41,32 @@
   box-sizing: border-box;
   /*Enhanced CSS  */
   flex-grow: 1;
-  padding: 18px 20px;
+  padding: 6px 10px;
   margin-right: 10px;
   border-radius: 60px;
   border: 2px solid transparent;
   font-size: 1.2em;
-  background-color: #efefef;
+  /*background-color: #efefef;*/
 }
 
+/* 默认占位符颜色 */
+input::placeholder {
+  color: gray;
+}
+
+/* 没有网络连接时的占位符颜色 
+tbd: not work as expected!!!
+*/
+.no-connection .input::placeholder {
+  color: red !important;
+}
+
+/*
 .input:focus {
   outline: none !important;
   border-color: #000;
   background-color: white;
-}
+}*/
 
 .button {
   /*Enhanced CSS to make sure inputForm fixed during message scrollbar scrolling*/
@@ -79,7 +92,7 @@
 
 .messages {
   /*Enhanced CSS to make sure inputForm fixed during message scrollbar scrolling*/
-  height: calc(100vh - 140px);
+  height: calc(100vh - 115px); 
   /*Enhanced CSS  */  
   flex-grow: 1;
   overflow-y: auto;

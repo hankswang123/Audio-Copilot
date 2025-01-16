@@ -638,8 +638,11 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
         <div ref={messagesEndRef} />      
       </div>
       <form
+        id="inputForm"
         onSubmit={handleSubmit}
-        className={`${styles.inputForm} ${styles.clearfix}`}
+        //className={`${styles.inputForm} ${styles.clearfix}`}
+        className={`${styles.inputForm} ${!realtimeClient.isConnected() ? 'no-connection' : ''}`}
+        style={{border: '1px solid #ccc'}}        
       >    
         <input
           id="chatInputBox"
@@ -647,30 +650,33 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
           className={styles.input}
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
-          placeholder="Ask me anything..."
-          style={{marginRight: '1px'}}
+          placeholder={realtimeClient.isConnected()? "Ask me anything..." : "Connect to Ask!"}
+          disabled={realtimeClient.isConnected() ? false : true}
+          style={{marginRight: '1px', border: 'none', outline: 'none'}}
         />  
         <Button
+          title={realtimeClient.isConnected() ? "" : "Connect to talk"}
           type="submit"
           className={styles.button}
           disabled={realtimeClient.isConnected() ? false : true}
           label={''}
-          iconPosition={'start'}
+          iconPosition={'end'}
           icon={ getIsMuted() ? MicOff : Mic}          
-          style={{ fontSize: 'medium', marginLeft: '1px', marginRight: '1px', display: userInput.trim() === '' ? 'flex' :'none' }}
+          style={{backgroundColor: 'transparent', fontSize: 'medium', marginLeft: '1px', marginRight: '1px', display: userInput.trim() === '' ? 'flex' :'none' }}
         />                        
         <Button
+              title={realtimeClient.isConnected() ? "" : "Connect to chat"}
               type="submit"
               id="submitButton"
               className={styles.button}
               label={''}
-              iconPosition={'start'}
+              iconPosition={'end'}
               icon= { Send }
               //disabled={isMuteBtnDisabled}
               disabled={realtimeClient.isConnected() ? inputDisabled : true}
               buttonStyle={'regular'}
               onFocus={() => {console.log('Mute/Unmute icon should not be displayed'); }}
-              style={{fontSize: 'medium', marginLeft: '1px', marginRight: '1px', display: userInput.trim() === '' ? 'none' :'flex'}}
+              style={{backgroundColor: 'transparent', fontSize: 'medium', marginLeft: '1px', marginRight: '0px', display: userInput.trim() === '' ? 'none' :'flex'}}
               //onClick={toggleMuteRecording}
             /> 
         <input
@@ -680,7 +686,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
           checked={realtimeClient.isConnected()? isChecked : false}
           disabled={!(realtimeClient.isConnected())? true : userInput.trim() === '' ? true : false}
           onChange={handleCheckboxChange}
-          //style={{position: 'absolute', top: '5%', left: '97%', transform: 'translate(-50%, -50%)', zIndex: 1}}
+          style={{display: 'none', position: 'absolute', top: '45%', left: '97%', transform: 'translate(-50%, -50%)', zIndex: 1}}
         />
       </form>        
     </div>
