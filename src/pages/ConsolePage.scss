@@ -64,13 +64,20 @@
 
   .audio-duration {
     position: absolute;
-    top: -1.85em; /* Adjust as needed */
+    top: -2em; /* Adjust as needed */
     right: 0;
     background-color: white;
     color:  rgba(0, 0, 0, 0.7);
     padding: 0.3125em;
     border-radius: 0.3125em;
     font-size: 0.8em;
+  }  
+
+  .selection-box {
+    position: absolute;
+    background-color: rgba(0, 0, 255, 0.2);
+    border: 2px dashed blue;
+    pointer-events: none;
   }  
 
   .input-box {

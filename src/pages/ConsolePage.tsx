@@ -35,8 +35,10 @@ import Chat, {openai} from '../components/chat/Chat';
 import PdfViewerWithIcons from '../components/pdf/PdfViewerWithIcons';
 import { Button } from '../components/button/Button';
 import SessionControls from "../components/webrtc/SessionControls";
-import { ModuleResolutionKind } from 'typescript';
-import { OpenAI } from "openai";
+//import { ModuleResolutionKind } from 'typescript';
+//import { OpenAI } from "openai";
+
+import html2canvas from 'html2canvas';
 
 /**
  * Type for all event logs
@@ -181,7 +183,84 @@ export function ConsolePage() {
 
   const [newMagzine, setNewMagzine] = useState(`${magzines[0].replace(/[_-]/g, " ")}`);
 
- // const [imgURL, setImgURL] = useState('');
+  const [isSelecting, setIsSelecting] = useState(false);
+  const selectionStart = useRef({ x: 0, y: 0 });
+  const selectionRef = useRef(null);
+  // 添加容器引用
+  const containerRefs = useRef({}); // 用于存储每个页面对的容器引用
+
+// 修改初始状态，添加 pairIndex
+  const [selectionBox, setSelectionBox] = useState({ 
+    x: 0, 
+    y: 0, 
+    width: 0, 
+    height: 0,
+    pairIndex: 0  // 添加初始 pairIndex
+  });
+
+// 修改选区组件
+const SelectionOverlay = ({ box, containerRef }) => {
+  if (!box || (!isSelecting && box.width === 0 && box.height === 0)) return null;
+  if (!containerRef?.current) return null;
+
+  const containerRect = containerRef.current.getBoundingClientRect();
+  
+  return (
+    <div
+      ref={selectionRef}
+      style={{
+        position: 'absolute', // 改回 absolute
+        left: `${box.x - containerRect.left}px`, // 使用相对于容器的坐标
+        top: `${box.y - containerRect.top}px`,
+        width: `${box.width}px`,
+        height: `${box.height}px`,
+        border: '2px solid #0095ff',
+        backgroundColor: 'rgba(0, 149, 255, 0.1)',
+        pointerEvents: 'none',
+        zIndex: 9999,
+      }}
+    />
+  );
+};
+
+  // Ensure each page has a RefObject  
+  useEffect(() => {
+    if (pageRefs.current.length < renderedPages.length) {
+      renderedPages.forEach((_, index) => {
+        if (!pageRefs.current[index]) {
+          pageRefs.current[index] = React.createRef<HTMLDivElement>();
+        }
+      });
+    }
+  }, [renderedPages])  
+
+  const analyzeImage = async (imgURL) => {
+    try {    
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Describe the image with simple and interesting english words within 100 length" },
+              {
+                type: "image_url",
+                image_url: {
+                  "url": imgURL,
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      console.log(response.choices[0].message.content);  
+      return response.choices[0].message.content;        
+    } catch (error) {
+      console.error('Error:', error.message);
+    }    
+
+  }
 
   // Initialize the keywords with the first magazine
   useEffect(() => {
@@ -303,31 +382,31 @@ export function ConsolePage() {
       return prev.includes(nextPage) ? prev : [...prev, nextPage];
     });    */
 
-  // 在双页视图模式下，一次加载两页
-  setRenderedPages((prev) => {
-    const nextPages = [...prev];
-    
-    if (isTwoPageView) {
-      // 如果是第一页，加载第2页和第3页
-      if (pageNumber === 1) {
-        if (!prev.includes(2)) nextPages.push(2);
-        if (!prev.includes(3)) nextPages.push(3);
+    // 在双页视图模式下，一次加载两页
+    setRenderedPages((prev) => {
+      const nextPages = [...prev];
+      
+      if (isTwoPageView) {
+        // 如果是第一页，加载第2页和第3页
+        if (pageNumber === 1) {
+          if (!prev.includes(2)) nextPages.push(2);
+          if (!prev.includes(3)) nextPages.push(3);
+        } else {
+          // 其他情况，加载后续两页
+          const nextPage1 = Math.min(pageNumber + 2, numPages || 0);
+          const nextPage2 = Math.min(pageNumber + 3, numPages || 0);
+          
+          if (!prev.includes(nextPage1)) nextPages.push(nextPage1);
+          if (!prev.includes(nextPage2)) nextPages.push(nextPage2);
+        }
       } else {
-        // 其他情况，加载后续两页
-        const nextPage1 = Math.min(pageNumber + 2, numPages || 0);
-        const nextPage2 = Math.min(pageNumber + 3, numPages || 0);
-        
-        if (!prev.includes(nextPage1)) nextPages.push(nextPage1);
-        if (!prev.includes(nextPage2)) nextPages.push(nextPage2);
+        // 单页视图模式
+        const nextPage = Math.min(pageNumber + 1, numPages || 0);
+        if (!prev.includes(nextPage)) nextPages.push(nextPage);
       }
-    } else {
-      // 单页视图模式
-      const nextPage = Math.min(pageNumber + 1, numPages || 0);
-      if (!prev.includes(nextPage)) nextPages.push(nextPage);
-    }
-    
-    return nextPages;
-  });  
+      
+      return nextPages;
+    });  
   };
 
   // 将页面分组为双页显示
@@ -413,6 +492,13 @@ export function ConsolePage() {
   }  
 
   const closeRightPanel = () => {
+
+    /*
+    const muteButton = document.getElementById('muteButton');
+    if(muteButton){
+      muteButton.style.display = 'flex';
+    } */   
+
     setIsCloseRightPanelDisabled(true);
     const splitter = document.getElementById('splitter');
     const chatBot = document.getElementById('chatContainer');
@@ -1897,6 +1983,12 @@ export function ConsolePage() {
   const openRightPanel = () => {
     //openChatbot();
 
+    /*
+    const muteButton = document.getElementById('muteButton');
+    if(muteButton){
+      muteButton.style.display = 'none';
+    }  */
+
     const rightArrow = document.getElementById('openRightArrow');
     if(rightArrow){
       rightArrow.style.display = 'none';
@@ -1973,7 +2065,7 @@ export function ConsolePage() {
         const client = clientRef.current;
         if (client.isConnected()){
           //showConversation();
-          openChatbot();
+          //openChatbot();
         }         
 
       } else {
@@ -2415,6 +2507,8 @@ export function ConsolePage() {
         }        
 
         await showVideofromYoutube(query);
+        //return imageDescriptionRef.current;
+        //return imageDescription;
 
         if(!isMuteBtnDisabled && !isMuted){
           muteBtnRef.current.click();
@@ -2422,6 +2516,52 @@ export function ConsolePage() {
 
       }
     );        
+    // Describe the selected image screenshot 
+    /*
+    client.addTool(
+      { 
+        name: 'image_describe',
+        description:
+          'Describe the image.',
+        parameters: {
+          type: 'object',
+          properties: {
+            imgURL: {
+              type: 'string',
+              description: 'The image URL to be used',
+            },           
+          },
+          required: ['imgURL'],
+        },
+      },
+      async({ imgURL }: { imgURL: string }) => {
+
+        //return await analyzeImage(imgURL);
+        return  imageDescription;
+
+      }
+    );       */         
+    client.addTool(
+      { 
+        name: 'selection_analyze',
+        description:
+          'Analyze the selection',
+        parameters: {
+          type: 'object',
+          properties: {
+            selection: {
+              type: 'string',
+              description: 'Selection to be used',
+            },           
+          },
+          required: ['selection'],
+        },
+      },
+      async({ selection }: { selection: string }) => {
+        //return await analyzeImage(imgURL);
+        return  'This is a beautiful image';
+      }
+    );           
     // Voice control the on-going playback
     client.addTool(
       { //Voice commands to control the on-going playback, e,g. pause, resume, speed up, speed down, 
@@ -2941,6 +3081,103 @@ export function ConsolePage() {
   <audio src="${audioUrl}" controls></audio>
   `;   
 
+// 添加截图菜单
+const showScreenshotMenu = (box) => {
+  const menu = document.createElement('div');
+  menu.style.position = 'fixed';
+  //menu.style.left = `${box.x + box.width/2}px`;
+  //menu.style.top = `${box.y + box.height}px`;
+
+  menu.style.left = `${box.x + box.width}px`;  // 改为选区右边
+  menu.style.top = `${box.y + box.height}px`;  // 保持在选区底部  
+
+  menu.style.backgroundColor = 'white';
+  menu.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+  menu.style.borderRadius = '4px';
+  menu.style.padding = '8px';
+  menu.style.zIndex = '1001';
+
+
+  menu.style.transform = 'translate(-100%, 0)'; // 向左偏移菜单自身的宽度  
+
+
+  // 添加一些边距
+  menu.style.marginLeft = '10px';  // 与选区保持一些距离
+  menu.style.marginTop = '5px';    // 与选区底部保持一些距离  
+
+  // 检查菜单是否超出视口
+  setTimeout(() => {
+    const menuRect = menu.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // 如果菜单超出右边界，向左移动
+    if (menuRect.right > viewportWidth) {
+      menu.style.left = `${viewportWidth - menuRect.width - 10}px`;
+    }
+
+    // 如果菜单超出底部边界，向上移动
+    if (menuRect.bottom > viewportHeight) {
+      menu.style.top = `${box.y - menuRect.height}px`;
+    }
+  }, 0);  
+
+// 修改截图函数
+const takeScreenshot = async () => {
+  const container = containerRefs.current[`pair_${selectionBox.pairIndex}`].current;
+  if (!container) return;
+
+  const canvas = await html2canvas(container, {
+    x: selectionBox.x,
+    y: selectionBox.y,
+    width: selectionBox.width,
+    height: selectionBox.height,
+    backgroundColor: null,
+  });
+
+  const imgURL = canvas.toDataURL();
+  
+  //await chatRef.current.updateImage(`![Image Could not be loaded](${imgURL})`);
+  //await chatRef.current.updateImage(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
+
+  const response = await analyzeImage(imgURL);
+
+  const client = clientRef.current;
+  if(client.isConnected()){
+      client.sendUserMessageContent([
+      {
+        type: `input_text`,
+        text: `Read Aloud: ${response}`,
+      },
+    ]);  
+  }   
+
+  // 下载截图
+  /*const link = document.createElement('a');
+  link.download = `screenshot_page_${selectionBox.pairIndex}.png`;
+  link.href = canvas.toDataURL();
+  link.click();*/
+};
+
+  const button = document.createElement('button');
+  button.textContent = 'Describe Selection';
+  button.onclick = takeScreenshot;
+  button.style.padding = '4px 8px';
+  button.style.cursor = 'pointer';
+  
+  menu.appendChild(button);
+  document.body.appendChild(menu);
+
+  // 点击其他地方关闭菜单
+  const closeMenu = (e) => {
+    if (!menu.contains(e.target)) {
+      document.body.removeChild(menu);
+      document.removeEventListener('click', closeMenu);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeMenu), 0);
+};  
+
   /**
    * Render the application
    */
@@ -3150,66 +3387,91 @@ export function ConsolePage() {
                 }}>
             {/*<Document file={pdfFilePath} onLoadSuccess={onDocumentLoadSuccess}>*/}
             <Document file={pdfFilePath1} onLoadSuccess={onDocumentLoadSuccess}>
-
-              {/* Previous Logic
-              {renderedPages.map((pageNumber) => (
-                <div
-                  ref={pageRefs.current[pageNumber]}
-                  key={`page_${pageNumber + 1}`}
-                  style={{
-                    marginBottom: '10px',
-                    flexShrink: 0, // Prevent shrinking
-                    margin: '20px auto', // Center the page horizontally
-                    width: 'fit-content', // Shrink wrapper to fit content width                    
-                  
-                  }}
-                >            
-                  <Page
-                    key={`page_${pageNumber}`}
-                    pageNumber={pageNumber}
-                    renderTextLayer={true} 
-                    renderAnnotationLayer={false}               
-                    onLoadSuccess={() => onPageLoadSuccess({ pageNumber })} // Incrementally add pages
-                    loading={<p>Loading page {pageNumber}...</p>} // Page loading indicator
-                  />
-                </div>
-              ))} */}
-
               {/* Page Rendering */}
-              {getPagePairs(renderedPages).map((pagePair, index) => (
-                <div
-                  key={`pair_${index}`}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    gap: isTwoPageView ? '0px' : '10px',
-                    marginBottom: '5px',
-                    margin: '8px auto',
-                    width: 'fit-content',
-                  }}
-                >
-                  {pagePair.map((pageNumber) => (
+              {getPagePairs(renderedPages).map((pagePair, index) => {
+                  // 确保 ref 存在
+                  if (!containerRefs.current[`pair_${index}`]) {
+                    containerRefs.current[`pair_${index}`] = React.createRef();
+                  }
+
+                  return (
                     <div
-                      ref={pageRefs.current[pageNumber]}
-                      key={`page_${pageNumber}`}
+                      ref={containerRefs.current[`pair_${index}`]}
+                      key={`pair_${index}`}
                       style={{
-                        flexShrink: 0,
-                        margin: 0, // Reset margin since it's handled by the pair container
+                        display: 'flex',
+                        justifyContent: 'center',
+                        gap: isTwoPageView ? '0px' : '10px',
+                        marginBottom: '5px',
+                        margin: '8px auto',
+                        width: 'fit-content',
+                        position: 'relative',
+                      }}
+                      onMouseDown={(e) => {
+                        // 添加调试日志
+                        console.log('Mouse down, containerRefs:', containerRefs.current);
+                        console.log('Current pair index:', index);
+                        console.log('Current container ref:', containerRefs.current[`pair_${index}`]);
+
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        selectionStart.current = { 
+                          x: e.clientX, 
+                          y: e.clientY 
+                        };
+                        setIsSelecting(true);
+                        setSelectionBox({ 
+                          x: e.clientX,
+                          y: e.clientY,
+                          width: 0, 
+                          height: 0,
+                          pairIndex: index 
+                        });
+                      }}
+                      onMouseMove={(e) => {
+                        if (!isSelecting) return;
+                        
+                        setSelectionBox(prev => ({
+                          ...prev,
+                          x: Math.min(e.clientX, selectionStart.current.x),
+                          y: Math.min(e.clientY, selectionStart.current.y),
+                          width: Math.abs(e.clientX - selectionStart.current.x),
+                          height: Math.abs(e.clientY - selectionStart.current.y),
+                        }));
+                      }}
+                      onMouseUp={() => {
+                        setIsSelecting(false);
+                        if (selectionBox.width > 10 && selectionBox.height > 10) {
+                          showScreenshotMenu(selectionBox);
+                        }
                       }}
                     >
-                      <Page
-                        pageNumber={pageNumber}
-                        renderTextLayer={true}
-                        renderAnnotationLayer={false}
-                        onLoadSuccess={() => onPageLoadSuccess({ pageNumber })}
-                        loading={<p>Loading page {pageNumber}...</p>}
-                        width={isTwoPageView ? 430 : 860} // 调整页面宽度
-                      />
-                    </div>
-                  ))}
-                </div>
-              ))}
-
+                      {pagePair.map((pageNumber) => (
+                        <div
+                          ref={pageRefs.current[pageNumber]}
+                          key={`page_${pageNumber}`}
+                          style={{
+                            flexShrink: 0,
+                            margin: 0,
+                          }}
+                        >
+                          <Page
+                            pageNumber={pageNumber}
+                            renderTextLayer={true}
+                            renderAnnotationLayer={false}
+                            onLoadSuccess={() => onPageLoadSuccess({ pageNumber })}
+                            loading={<p>Loading page {pageNumber}...</p>}
+                            width={isTwoPageView ? 430 : 860}
+                          />
+                        </div>
+                      ))}
+                      {selectionBox.pairIndex === index && (
+                        <SelectionOverlay 
+                          box={selectionBox} 
+                          containerRef={containerRefs.current[`pair_${index}`]}
+                        />
+                      )}
+                  </div>);
+              })}
             </Document>
           </div> 
         </div>
@@ -3383,7 +3645,7 @@ export function ConsolePage() {
         {/* Progress bar area */}
         <div 
           ref={progressBarRef}
-          style={{position: 'relative', width: '65%', backgroundColor: '#ccc', height: '0.625em', borderRadius: '0.3125em', marginTop: '0.2em', marginLeft: '-1px', userSelect: 'none' }}
+          style={{position: 'relative', width: '60%', backgroundColor: '#ccc', height: '0.625em', borderRadius: '0.3125em', marginTop: '0.2em', marginLeft: '-1px', userSelect: 'none' }}
           onMouseDown={handleMouseDown}>
           <div style={{ 
                         width: `${progress}%`,
@@ -3512,18 +3774,20 @@ export function ConsolePage() {
         </div>  
 
         {/* Mute/Unmute Button to have a real time conversion */}                      
-        <button ref={muteBtnRef} onClick={toggleMuteRecording} className='hidden-button'></button>  
+        <button id="muteButtonRef" ref={muteBtnRef} onClick={toggleMuteRecording} className='hidden-button'></button>  
         <div className="tooltip-container">
           <Button
               id="muteButton"
               label={isMuted ? '' : ''}
               iconPosition={'start'}
-              icon={isMuted ? MicOff : Mic}
+              icon={!isConnected? Zap : isMuted ? MicOff : Mic}
+              //icon={!isConnected? Zap : !isCloseRightPanelDisabled ? X : isMuted ? MicOff : Mic}
+              //disabled={ (isConnected&&!isCloseRightPanelDisabled) ? true: false}
               //disabled={isMuteBtnDisabled}
-              disabled={!isConnected}
+              //disabled={!isConnected}
               buttonStyle={'regular'}
               onClick={toggleMuteRecording}
-              className='hidden-button'
+              //className='hidden-button'
             />
           <div className="tooltip"  style={{display: isCaptionVisible && 'none'}}>
             <strong className='tooltip-title'>Turn <>{isMuted ? 'on' : 'off'}</> microphone</strong><br />
@@ -3534,9 +3798,10 @@ export function ConsolePage() {
         {/*Display Copilot Status*/}      
         <div style={{ fontSize: '1em', userSelect: 'none', marginLeft: '5px' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Error Occurred!</span></> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div>      
 
-        <Zap onClick={ isConnected ? disConnnectRealtimeAPI : connnectRealtimeAPI } style={{ display: isConnected ? "none" : "flex", marginRight: "1px", marginLeft: "auto", justifyContent: "flex-end", zIndex: '9999', userSelect: 'none', cursor: "pointer" }}/>      
+        {/*<Zap onClick={ isConnected ? disConnnectRealtimeAPI : connnectRealtimeAPI } style={{ display: isConnected ? "none" : "flex", marginRight: "1px", marginLeft: "auto", justifyContent: "flex-end", zIndex: '9999', userSelect: 'none', cursor: "pointer" }}/>      */}
         {/*Settings for AI assistant and Realtime API*/} 
-        <div style={{display:"flex", marginRight: "0px", marginLeft: isConnected ? "auto" : "1px", justifyContent: "flex-end", zIndex: '9999', userSelect: 'none' }}>            
+        {/*<div style={{display:"flex", marginRight: "0px", marginLeft: isConnected ? "auto" : "1px", justifyContent: "flex-end", zIndex: '9999', userSelect: 'none' }}>            */} 
+        <div style={{display:"flex", marginRight: "0px", marginLeft: "auto", justifyContent: "flex-end", zIndex: '9999', userSelect: 'none' }}>            
           <div className="setting-container" style={{display: "flex"}}>
             <Settings style={{ width: '20px', height: '20px',marginLeft: '1px', marginRight: '1px' }}/>
             <div className="setting">

@@ -76,8 +76,18 @@ type MessageProps = {
 };
 
 const UserMessage = ({ text }: { text: string }) => {
+
+  const preprocessText = (text: string) => {
+
+    if (text.includes('Read Aloud:') ) {
+      return 'Describe Selection';
+    }
+    return text;    
+
+  };
+
   return <div className={styles.userMessage}>
-          <Markdown rehypePlugins={[rehypeRaw]}>{text}</Markdown>
+          <Markdown rehypePlugins={[rehypeRaw]}>{preprocessText(text)}</Markdown>
         </div>;
 };
 
@@ -629,6 +639,18 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
     setIsChecked(event.target.checked);
   }
 
+  function handleInputOnChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    //setIsChecked(event.target.checked);
+    setUserInput(event.target.value);
+
+    if(!getIsMuted()) {    
+      const muteButton = document.getElementById('muteButton');
+      if (muteButton) {
+        muteButton.click();
+      }
+    }
+  }  
+
   return (
     <div className={styles.chatContainer}>
       <div className={styles.messages}>
@@ -642,14 +664,15 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
         onSubmit={handleSubmit}
         //className={`${styles.inputForm} ${styles.clearfix}`}
         className={`${styles.inputForm} ${!realtimeClient.isConnected() ? 'no-connection' : ''}`}
-        style={{border: '1px solid #ccc'}}        
+        style={{border: '2px solid #ccc',marginLeft: '1px', marginRight: "1px"}}        
       >    
         <input
           id="chatInputBox"
           type="text"
           className={styles.input}
           value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
+          //onChange={(e) => setUserInput(e.target.value)}
+          onChange={handleInputOnChange}
           placeholder={realtimeClient.isConnected()? "Ask me anything..." : "Connect to Ask!"}
           disabled={realtimeClient.isConnected() ? false : true}
           style={{marginRight: '1px', border: 'none', outline: 'none'}}
@@ -663,6 +686,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
           iconPosition={'end'}
           icon={ getIsMuted() ? MicOff : Mic}          
           style={{backgroundColor: 'transparent', fontSize: 'medium', marginLeft: '1px', marginRight: '1px', display: userInput.trim() === '' ? 'flex' :'none' }}
+          //style={{backgroundColor: 'transparent', fontSize: 'medium', marginLeft: '1px', marginRight: '1px', display: 'none' }}
         />                        
         <Button
               title={realtimeClient.isConnected() ? "" : "Connect to chat"}
@@ -677,6 +701,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
               buttonStyle={'regular'}
               onFocus={() => {console.log('Mute/Unmute icon should not be displayed'); }}
               style={{backgroundColor: 'transparent', fontSize: 'medium', marginLeft: '1px', marginRight: '0px', display: userInput.trim() === '' ? 'none' :'flex'}}
+              //style={{backgroundColor: 'transparent', fontSize: 'medium', marginLeft: '1px', marginRight: '0px', display: 'flex'}}
               //onClick={toggleMuteRecording}
             /> 
         <input
