@@ -105,12 +105,6 @@ const UserMessage = ({ text }: { text: string }) => {
       return null;
   }   
 
-  /*
-  return <div className={styles.userMessage}>
-          <Markdown rehypePlugins={[rehypeRaw]}
-          >{preprocessText(text)}</Markdown>
-        </div>;
-        */
 };
 
 const AssistantMessage = ({ text }: { text: string }) => {
