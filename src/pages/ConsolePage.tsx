@@ -198,30 +198,31 @@ export function ConsolePage() {
     pairIndex: 0  // 添加初始 pairIndex
   });
 
-// 修改选区组件
-const SelectionOverlay = ({ box, containerRef }) => {
-  if (!box || (!isSelecting && box.width === 0 && box.height === 0)) return null;
-  if (!containerRef?.current) return null;
+  // Screenshot Selection Area
+  const SelectionOverlay = ({ box, containerRef }) => {
+    if (!box || (!isSelecting && box.width === 0 && box.height === 0)) return null;
+    if (!containerRef?.current) return null;
 
-  const containerRect = containerRef.current.getBoundingClientRect();
-  
-  return (
-    <div
-      ref={selectionRef}
-      style={{
-        position: 'absolute', // 改回 absolute
-        left: `${box.x - containerRect.left}px`, // 使用相对于容器的坐标
-        top: `${box.y - containerRect.top}px`,
-        width: `${box.width}px`,
-        height: `${box.height}px`,
-        border: '2px solid #0095ff',
-        backgroundColor: 'rgba(0, 149, 255, 0.1)',
-        pointerEvents: 'none',
-        zIndex: 9999,
-      }}
-    />
-  );
-};
+    const containerRect = containerRef.current.getBoundingClientRect();
+    
+    return (
+      <div
+        ref={selectionRef}
+        style={{
+          position: 'absolute', // 改回 absolute
+          left: `${box.x - containerRect.left}px`, // 使用相对于容器的坐标
+          top: `${box.y - containerRect.top}px`,
+          width: `${box.width}px`,
+          height: `${box.height}px`,
+          border: '2px solid #0095ff',
+          //border: isSelecting ? '2px solid #0095ff' : 'none', // 只在选择时显示边框
+          backgroundColor: 'rgba(0, 149, 255, 0.1)',
+          pointerEvents: 'none',
+          zIndex: 9999,
+        }}
+      />
+    );
+  };
 
   // Ensure each page has a RefObject  
   useEffect(() => {
@@ -234,6 +235,162 @@ const SelectionOverlay = ({ box, containerRef }) => {
     }
   }, [renderedPages])  
 
+  // screenshot menu poupup after mouseup
+  const showScreenshotMenu = (box) => {
+    const menu = document.createElement('div');
+    menu.style.position = 'fixed';
+
+    menu.style.left = `${box.x + box.width - 5}px`;  // 改为选区右边
+    menu.style.top = `${box.y + box.height}px`;  // 保持在选区底部  
+    menu.style.backgroundColor = 'white';
+    menu.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+    menu.style.borderRadius = '4px';
+    menu.style.padding = '8px';
+    menu.style.zIndex = '1001';
+    menu.style.transform = 'translate(-100%, 0)'; // 向左偏移菜单自身的宽度  
+
+
+    // 添加一些边距
+    menu.style.marginLeft = '10px';  // 与选区保持一些距离
+    menu.style.marginTop = '5px';    // 与选区底部保持一些距离  
+
+    // 检查菜单是否超出视口
+    setTimeout(() => {
+      const menuRect = menu.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // 如果菜单超出右边界，向左移动
+      if (menuRect.right > viewportWidth) {
+        menu.style.left = `${viewportWidth - menuRect.width - 10}px`;
+      }
+
+      // 如果菜单超出底部边界，向上移动
+      if (menuRect.bottom > viewportHeight) {
+        menu.style.top = `${box.y - menuRect.height}px`;
+      }
+    }, 0);  
+
+    // 添加加载动画函数
+    let loadingInterval;
+    const startLoading = () => {
+      let dots = '';
+      button.disabled = true; // 禁用按钮
+      button.style.cursor = 'wait';
+      button.style.textAlign = 'left';
+      button.textContent = 'Start analyzing...'
+
+      loadingInterval = setInterval(() => {
+        dots = dots.length >= 3 ? '' : dots + '.';
+        button.textContent = 'Start analyzing' + dots;
+      }, 500);      
+    };
+
+    const stopLoading = () => {
+  
+      clearInterval(loadingInterval);
+  
+      // 通过 setSelectionBox 重置选区状态
+      setSelectionBox({ x: 0, y: 0, width: 0, height: 0, pairIndex: 0 });
+      
+      // 移除菜单
+      if (document.body.contains(menu)) {
+        document.body.removeChild(menu);
+      }
+      // 移除事件监听器
+      document.removeEventListener('click', closeMenu);    
+    };    
+
+    const imgDescribe = async () => {
+
+      startLoading(); // 开始加载动画
+
+      requestAnimationFrame(async () => {
+
+          try {
+            const container = containerRefs.current[`pair_${selectionBox.pairIndex}`].current;
+            if (!container) return;
+
+            //startLoading(); // 开始加载动画
+            //await Promise.resolve();
+
+          // 获取选区元素
+            const selectionElement = selectionRef.current;
+            if (selectionElement) {
+
+              // 获取容器的位置信息
+              const containerRect = container.getBoundingClientRect();
+              
+              // 计算选区相对于容器的位置
+              const relativeX = selectionBox.x - containerRect.left;
+              const relativeY = selectionBox.y - containerRect.top;      
+
+              // 使用相对坐标进行截图
+              const canvas = await html2canvas(container, {
+                x: relativeX + 2,
+                y: relativeY + 2,
+                width: selectionBox.width - 4,
+                height: selectionBox.height - 4,
+                backgroundColor: null,
+                // 添加这些选项以提高精确度
+                scale: window.devicePixelRatio, // 使用设备像素比
+                useCORS: true,
+                logging: true,
+                windowWidth: containerRect.width,
+                windowHeight: containerRect.height,
+              });     
+
+              const imgURL = canvas.toDataURL('image/png');
+              await chatRef.current.updateScreenshot(imgURL);
+              const response = await analyzeImage(imgURL);
+
+              stopLoading(); // 停止加载动画    
+
+              // Read Aloud the image description from LLM
+              const client = clientRef.current;
+              if(client.isConnected()){
+                  client.sendUserMessageContent([
+                  {
+                    type: `input_text`,
+                    text: `Read Aloud: ${response}`,
+                  },
+                ]);  
+              }
+
+              // 下载截图
+              /*const link = document.createElement('a');
+              link.download = `screenshot_page_${selectionBox.pairIndex}.png`;
+              link.href = canvas.toDataURL();
+              link.click();*/
+            }
+          } catch (error) {
+            console.error('Screenshot error:', error);
+          }
+      });
+    };
+
+    const button = document.createElement('button');
+    button.textContent = 'Describe Selection';
+    button.onclick = imgDescribe;
+    button.style.width = '140px'; 
+    button.style.padding = '4px 8px';
+    button.style.cursor = 'pointer';
+    
+    menu.appendChild(button);
+    document.body.appendChild(menu);
+
+    // 点击其他地方关闭菜单
+    const closeMenu = (e) => {
+      if (!menu.contains(e.target)) {
+        clearInterval(loadingInterval); // 清除动画定时器
+        document.body.removeChild(menu);
+        document.removeEventListener('click', closeMenu);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+  };    
+
+  //Call LLM visual capbilities to analyze the image
   const analyzeImage = async (imgURL) => {
     try {    
       const response = await openai.chat.completions.create({
@@ -257,9 +414,8 @@ const SelectionOverlay = ({ box, containerRef }) => {
       console.log(response.choices[0].message.content);  
       return response.choices[0].message.content;        
     } catch (error) {
-      console.error('Error:', error.message);
+      console.error('Analyaze Image Error:', error.message);
     }    
-
   }
 
   // Initialize the keywords with the first magazine
@@ -1447,6 +1603,7 @@ const SelectionOverlay = ({ box, containerRef }) => {
     await sleep(1500);    
     clientRef.current.updateSession({ instructions: instructions.current }); 
 
+    /*
     let imgURL = localStorage.getItem(`tmp::${word}`);
     if(imgURL !== null && imgURL.length > 0){
       if(imgURL.includes(' ')){
@@ -1455,16 +1612,21 @@ const SelectionOverlay = ({ box, containerRef }) => {
         await chatRef.current.updateImage(`![Image Could not be loaded](${imgURL})`);      
       } 
       return;     
-    }
+    }*/
 
     const response: Response = await fetch(`http://localhost:3001/api/image_gen?magzine=${encodeURIComponent(newMagzine)}&word=${(word)}`);    
-    imgURL = await response.json();
-    localStorage.setItem(`tmp::${word}`, imgURL);
+    const imgURL = await response.json();
+    console.log(imgURL);
+    //localStorage.setItem(`tmp::${word}`, imgURL);
+    
     if(imgURL.includes(' ')){
-      await chatRef.current.updateImage(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
+      await chatRef.current.updateGenImage(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
     }else{
-      await chatRef.current.updateImage(`![Image Could not be loaded](${imgURL}?t=${Date.now()})`);
-    }    
+      //with request with timestamp parameter will lead to frontpage refresh after image generated is saved in backend
+      //await chatRef.current.updateImage(`![Image Could not be loaded](${imgURL}?t=${Date.now()})`);
+      //await chatRef.current.updateGenImage(`![Image Could not be loaded](${imgURL})`);
+      await chatRef.current.updateGenImage(`![Image Could not be loaded](${encodeURIComponent(imgURL)})`);
+    }   
     
   }
 
@@ -3081,103 +3243,6 @@ const SelectionOverlay = ({ box, containerRef }) => {
   <audio src="${audioUrl}" controls></audio>
   `;   
 
-// 添加截图菜单
-const showScreenshotMenu = (box) => {
-  const menu = document.createElement('div');
-  menu.style.position = 'fixed';
-  //menu.style.left = `${box.x + box.width/2}px`;
-  //menu.style.top = `${box.y + box.height}px`;
-
-  menu.style.left = `${box.x + box.width}px`;  // 改为选区右边
-  menu.style.top = `${box.y + box.height}px`;  // 保持在选区底部  
-
-  menu.style.backgroundColor = 'white';
-  menu.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-  menu.style.borderRadius = '4px';
-  menu.style.padding = '8px';
-  menu.style.zIndex = '1001';
-
-
-  menu.style.transform = 'translate(-100%, 0)'; // 向左偏移菜单自身的宽度  
-
-
-  // 添加一些边距
-  menu.style.marginLeft = '10px';  // 与选区保持一些距离
-  menu.style.marginTop = '5px';    // 与选区底部保持一些距离  
-
-  // 检查菜单是否超出视口
-  setTimeout(() => {
-    const menuRect = menu.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    // 如果菜单超出右边界，向左移动
-    if (menuRect.right > viewportWidth) {
-      menu.style.left = `${viewportWidth - menuRect.width - 10}px`;
-    }
-
-    // 如果菜单超出底部边界，向上移动
-    if (menuRect.bottom > viewportHeight) {
-      menu.style.top = `${box.y - menuRect.height}px`;
-    }
-  }, 0);  
-
-// 修改截图函数
-const takeScreenshot = async () => {
-  const container = containerRefs.current[`pair_${selectionBox.pairIndex}`].current;
-  if (!container) return;
-
-  const canvas = await html2canvas(container, {
-    x: selectionBox.x,
-    y: selectionBox.y,
-    width: selectionBox.width,
-    height: selectionBox.height,
-    backgroundColor: null,
-  });
-
-  const imgURL = canvas.toDataURL();
-  
-  //await chatRef.current.updateImage(`![Image Could not be loaded](${imgURL})`);
-  //await chatRef.current.updateImage(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
-
-  const response = await analyzeImage(imgURL);
-
-  const client = clientRef.current;
-  if(client.isConnected()){
-      client.sendUserMessageContent([
-      {
-        type: `input_text`,
-        text: `Read Aloud: ${response}`,
-      },
-    ]);  
-  }   
-
-  // 下载截图
-  /*const link = document.createElement('a');
-  link.download = `screenshot_page_${selectionBox.pairIndex}.png`;
-  link.href = canvas.toDataURL();
-  link.click();*/
-};
-
-  const button = document.createElement('button');
-  button.textContent = 'Describe Selection';
-  button.onclick = takeScreenshot;
-  button.style.padding = '4px 8px';
-  button.style.cursor = 'pointer';
-  
-  menu.appendChild(button);
-  document.body.appendChild(menu);
-
-  // 点击其他地方关闭菜单
-  const closeMenu = (e) => {
-    if (!menu.contains(e.target)) {
-      document.body.removeChild(menu);
-      document.removeEventListener('click', closeMenu);
-    }
-  };
-  setTimeout(() => document.addEventListener('click', closeMenu), 0);
-};  
-
   /**
    * Render the application
    */
@@ -3407,12 +3472,21 @@ const takeScreenshot = async () => {
                         width: 'fit-content',
                         position: 'relative',
                       }}
+
                       onMouseDown={(e) => {
                         // 添加调试日志
                         console.log('Mouse down, containerRefs:', containerRefs.current);
                         console.log('Current pair index:', index);
                         console.log('Current container ref:', containerRefs.current[`pair_${index}`]);
 
+                        if(!e.ctrlKey) { 
+                          setSelectionBox({ x: 0, y: 0, width: 0, height: 0, pairIndex: 0 });
+                          return;
+                        }else { 
+                          document.body.style.userSelect = 'none'; // Prevent text selection
+                        }
+
+                        //document.body.style.userSelect = 'none'; // Prevent text selection
                         const rect = e.currentTarget.getBoundingClientRect();
                         selectionStart.current = { 
                           x: e.clientX, 
@@ -3427,6 +3501,7 @@ const takeScreenshot = async () => {
                           pairIndex: index 
                         });
                       }}
+
                       onMouseMove={(e) => {
                         if (!isSelecting) return;
                         
@@ -3438,8 +3513,16 @@ const takeScreenshot = async () => {
                           height: Math.abs(e.clientY - selectionStart.current.y),
                         }));
                       }}
-                      onMouseUp={() => {
+
+                      onMouseUp={(e) => {
                         setIsSelecting(false);
+                        if(!e.ctrlKey) { 
+                          return;
+                        }else { 
+                          document.body.style.userSelect = 'auto'; // Prevent text selection
+                        }
+
+                        //document.body.style.userSelect = 'auto'; // Restore text selection
                         if (selectionBox.width > 10 && selectionBox.height > 10) {
                           showScreenshotMenu(selectionBox);
                         }

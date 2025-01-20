@@ -111,13 +111,11 @@ const promptGen = async (word) => {
 // Generate image from recraft.ai
 // used by word card
 app.get("/api/image_gen", async (req, res) => {
-
-    //const { magzine, word, prompt } = req.query;
     const { magzine, word } = req.query;
 
-    try{
-
-        const dirPath = path.join(__dirname, `public/wordCard/${magzine}`);
+    try {
+        // dirPath = path.join(__dirname, `public/wordCard/${magzine}`);
+        const dirPath = path.join(__dirname, `public/wordCard`);
         const filePath = path.join(dirPath, `${word}.png`);        
 
         // Ensure the directory exists
@@ -127,7 +125,8 @@ app.get("/api/image_gen", async (req, res) => {
 
         // Check if the file already exists
         if (fs.existsSync(filePath)) {
-            res.json(`/wordCard/${magzine}/${word}.png`);
+            //res.json(`/wordCard/${magzine}/${word}.png`);
+            res.json(`/wordCard/${word}.png`);
             return;
         }        
 
@@ -139,51 +138,59 @@ app.get("/api/image_gen", async (req, res) => {
             throw new Error("recraft API key is not set");
         }         
 
-        //since recraft API is openAI compitable, just use recraft's URL and apiKey
         const recraft = new OpenAI({
             baseURL: process.env.RECRAFT_API_URL,
-            //baseURL: 'https://external.api.recraft.ai/v1/',
             apiKey: apikey,
         });               
-        
-        if(!prompt){
-            prompt = word;
-        }
 
-        // https://www.recraft.ai/docs#generate-image
-        const imgRes = await recraft.images.generate( {
-            // prompt: 'a sunny park where people are smiling and greeting each other, creating a very friendly atomosphere',
+        const finalPrompt = prompt || word;
+
+        const imgRes = await recraft.images.generate({
             model: 'recraft20b',
-            prompt: prompt, //'a bright eye with starry sky reflected in the pupil, appearing mysterious and deep',
+            prompt: finalPrompt,
             style: 'digital_illustration',
-            extra_body: {'substyle': 'hand_drawn'}, // https://www.recraft.ai/docs#list-of-styles
-            //style: 'vector_illustration',
-            //style: 'icon',        
+            extra_body: {'substyle': 'hand_drawn'},
         }); 
-        res.json(imgRes.data[0].url);
-        
-        // Save the PNG file to the desired directory        
-        // TBD(issue): whole page will be refreshed after image is downloaded
-        /*
-        const writer = fs.createWriteStream(filePath);
-        const imgUrl = imgRes.data[0].url;
-        const imgResponse = await axios.get(imgUrl, { responseType: 'stream', maxRedirects: 0 });
-        imgResponse.data.pipe(writer);        
 
-        writer.on('finish', () => {
-            console.info('Image downloaded successfully');
-            res.json(`/wordCard/${magzine}/${word}.png`);
+        const imgUrl = imgRes.data[0].url;
+        const imgResponse = await axios.get(imgUrl, { responseType: 'arraybuffer' });
+        await fs.promises.writeFile(filePath, imgResponse.data);
+        //res.json(`/wordCard/${magzine}/${word}.png`);        
+        res.json(`/wordCard/${word}.png`);        
+
+        // 使用 Promise 处理图片下载
+        /*
+        await new Promise(async (resolve, reject) => {
+            try {
+                const imgUrl = imgRes.data[0].url;
+                const imgResponse = await axios.get(imgUrl, { 
+                    responseType: 'stream',
+                    maxRedirects: 0 
+                });
+
+                const writer = fs.createWriteStream(filePath);
+                
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+                
+                imgResponse.data.pipe(writer);
+            } catch (error) {
+                reject(error);
+            }
         });
 
-        writer.on('error', (error) => {
-            console.error('Error saving PGN file from Recraft:', error);
-            res.status(500).json({ error: error.message });
-        });     */         
-        
-      }catch(error){
+        // 图片保存完成后再发送响应
+        console.info('Image downloaded successfully');
+        res.setHeader('Content-Type', 'application/json');
+        res.json(`/wordCard/${magzine}/${word}.png`);*/
+
+    } catch(error) {
         console.error('Error generating image:', error);
-        res.status(600).json({ error: 'Failed to generate Image from recraft.ai', details: error.message });
-      }     
+        res.status(500).json({ 
+            error: 'Failed to generate Image from recraft.ai', 
+            details: error.message 
+        });
+    }     
 });
 
 // An endpoint which would work with the client code above - it returns

@@ -130,6 +130,12 @@ tbd: not work as expected!!!
   background-color: #000;*/
 }
 
+.userMessage img {
+  max-width: 100%;
+  margin: 8px 0px 8px 0px;
+  border-radius: 8px;
+}
+
 .assistantMessage {
   background-color: #efefef;
 }

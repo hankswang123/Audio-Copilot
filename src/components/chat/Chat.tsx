@@ -80,15 +80,37 @@ const UserMessage = ({ text }: { text: string }) => {
   const preprocessText = (text: string) => {
 
     if (text.includes('Read Aloud:') ) {
-      return 'Describe Selection';
-    }
+      //return 'Describe Selection';
+      return '';
+    }  
     return text;    
-
   };
 
+  //If screenshot image URL passed in, show the image directly by <img> tag
+  const messageType = text.includes('data:image/png;base64,') ? 'image' : 'text'; 
+
+  switch (messageType) {
+    case "text":
+      if(!text.includes('Read Aloud:') ){
+        return <div className={styles.userMessage}>
+                <Markdown rehypePlugins={[rehypeRaw]}
+                >{preprocessText(text)}</Markdown>
+              </div>
+      }else{return null;}
+    case "image":
+      return <div className={styles.userMessage}>
+              <img src={text} alt="Captured Element" style={{maxWidth: '100%', height: 'auto'}} />
+             </div>
+    default:
+      return null;
+  }   
+
+  /*
   return <div className={styles.userMessage}>
-          <Markdown rehypePlugins={[rehypeRaw]}>{preprocessText(text)}</Markdown>
+          <Markdown rehypePlugins={[rehypeRaw]}
+          >{preprocessText(text)}</Markdown>
         </div>;
+        */
 };
 
 const AssistantMessage = ({ text }: { text: string }) => {
@@ -318,15 +340,21 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
     },
     updateVideo(embedUrl) {
       appendMessage("assistant", embedUrl);
-    },  
-    updateImage(imgUrl) {
+    }, 
+    updateGenImage(imgUrl) {
       appendMessage("assistant", imgUrl);
+    },      
+    updateScreenshot(imgUrl) {
+      appendMessage("user", imgUrl);
     },     
     updateSelection(selection) {
       //appendMessage("user", `<div style={fontSize: '0.2em',}>[Read Aloud]:</div><br />`+ selection);
       appendMessage("user", '[Read Aloud]:<br />'+ selection);
     },          
-
+    updateImgAnalyzeResponse() {
+      //appendMessage("user", `<div style={fontSize: '0.2em',}>[Read Aloud]:</div><br />`+ selection);
+      appendMessage("assistant", 'Begin to analyze...');
+    },    
     updateReadAloud(audio_url) {
       appendMessage("read_aloud", audio_url);
     },        
