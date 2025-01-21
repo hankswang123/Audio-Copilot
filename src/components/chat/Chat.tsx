@@ -86,6 +86,21 @@ const UserMessage = ({ text }: { text: string }) => {
     return text;    
   };
 
+  const handleImgDoubleClick = (src: string) => {
+    const popupOverlay = document.getElementById('popupOverlay');
+    const imageFrame = document.getElementById('imageFrame');
+    const videoFrame = document.getElementById('videoFrame');
+    const popupContent = document.getElementById('popupContent');    
+
+    (imageFrame as HTMLImageElement).src = src;
+    (popupContent as HTMLIFrameElement).className = 'popup-content-video';
+    if (popupOverlay){
+      popupOverlay.style.display = 'flex';
+      (imageFrame as HTMLImageElement).style.display = 'flex';
+      (videoFrame as HTMLIFrameElement).style.display = 'none';
+    }
+  }  
+
   //If screenshot image URL passed in, show the image directly by <img> tag
   const messageType = text.includes('data:image/png;base64,') ? 'image' : 'text'; 
 
@@ -99,7 +114,13 @@ const UserMessage = ({ text }: { text: string }) => {
       }else{return null;}
     case "image":
       return <div className={styles.userMessage}>
-              <img src={text} alt="Captured Element" style={{maxWidth: '100%', height: 'auto'}} />
+              <img src={text} alt="Captured Element"               
+                   onDoubleClick={() => handleImgDoubleClick(text)}
+                  style={{
+                    //maxWidth: "300px",
+                    cursor: "pointer",
+                    border: "1px solid #ccc",
+                  }} />
              </div>
     default:
       return null;
@@ -116,23 +137,46 @@ const AssistantMessage = ({ text }: { text: string }) => {
     return text;
   };  
 
+  const handleImgDoubleClick = (src: string) => {
+    const popupOverlay = document.getElementById('popupOverlay');
+    const imageFrame = document.getElementById('imageFrame');
+    const videoFrame = document.getElementById('videoFrame');
+    const popupContent = document.getElementById('popupContent');    
+
+    (imageFrame as HTMLImageElement).src = src;
+    (popupContent as HTMLIFrameElement).className = 'popup-content-video';
+    if (popupOverlay){
+      popupOverlay.style.display = 'flex';
+      (imageFrame as HTMLImageElement).style.display = 'flex';
+      (videoFrame as HTMLIFrameElement).style.display = 'none';
+    }
+  }
+
   return (  
     <div className={styles.assistantMessage}>
-	    <Markdown rehypePlugins={[rehypeRaw]}>{preprocessText(text)}</Markdown>
+	    <Markdown rehypePlugins={[rehypeRaw]}         components={{
+          img: ({ src, alt }) => (
+            <img
+              src={src}
+              alt={alt}
+              onDoubleClick={() => handleImgDoubleClick(src)}
+              style={{
+                //maxWidth: "300px",
+                cursor: "pointer",
+                border: "1px solid #ccc",
+              }}
+            />
+          ),
+        }}>{preprocessText(text)}</Markdown>
     </div>    
   );
+  
+
   /* original code
     <div className={styles.assistantMessage}>
 	    <Markdown rehypePlugins={[rehypeRaw]}>{preprocessText(text)}</Markdown>
     </div>    
-  */
-  /* test show img in chat history list
-    <div className={styles.assistantMessage}>
-      <Markdown rehypePlugins={[rehypeRaw]}>
-        {'<img src="./wordCard/National Geographic Little Kids UK Issue 23 2024/Orange.png" style="border-radius: 9px; width: 200px; height: 200px;" />'}
-      </Markdown>
-    </div>
-  */  
+  */ 
 };
 
 const ReadAloudMessage = ({ text }: { text: string }) => {

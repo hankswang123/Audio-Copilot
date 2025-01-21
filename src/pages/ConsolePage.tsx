@@ -460,6 +460,28 @@ export function ConsolePage() {
     audioCaptions.current = newAudioCaptions; // Sync ref with the updated state
   }, [newAudioCaptions]);  
 
+  const isAudioExisting = async () => {
+    try {
+      const response = await fetch(`./play/${newMagzine}/${newMagzine}.wav`, {
+        method: 'HEAD', // Or 'GET' depending on your needs
+      });
+  
+      if (response.ok) {
+        console.log('Audio exists!');
+        return true;
+      } else if (response.status === 404) {
+        console.log('Audio not found.');
+        return false;
+      } else {
+        console.log(`Unexpected status: ${response.status}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking resource:', error);
+      return false;
+    }  
+  };
+
   // Update PDF file path, audio file path and audio captions when a new magzine is selected
   const handleSelectChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newMagzine = event.target.value;
@@ -1877,8 +1899,7 @@ export function ConsolePage() {
         }  
       } else if (e.code === 'Escape') {
 
-        //closeRightPanel();
-        closeRightArrowNew();
+        //closeRightArrowNew();
 
         // Close the popup when pressing the Escape key
         const popupOverlay = document.getElementById('popupOverlay');
@@ -1887,7 +1908,16 @@ export function ConsolePage() {
           if (videoFrame) {
             (videoFrame as HTMLIFrameElement).src = '';
           }
-          popupOverlay.style.display = 'none';
+          const imageFrame = document.getElementById('imageFrame');
+          if (imageFrame) {
+            (imageFrame as HTMLImageElement).src = '';
+          }          
+
+          if( popupOverlay.style.display === 'flex' ){
+            popupOverlay.style.display = 'none';
+          } else{
+            closeRightArrowNew();
+          }
 
           (searchBox as HTMLInputElement).value = ''; // Clear the search box
 
@@ -2046,8 +2076,8 @@ export function ConsolePage() {
     const searchBox = document.getElementById('searchBox');
     const popupOverlay = document.getElementById('popupOverlay');
     const videoFrame = document.getElementById('videoFrame');
+    const imageFrame = document.getElementById('imageFrame');
     const popupContent = document.getElementById('popupContent');
-    const chatBot = document.getElementById('chatBot');
    
     performYoutubeSearch(query)
     .then((results) => {
@@ -2064,7 +2094,7 @@ export function ConsolePage() {
           console.log(`Embeddable URL: ${embedUrl}`);
           (videoFrame as HTMLIFrameElement).src = embedUrl;
           (videoFrame as HTMLIFrameElement).style.display = 'flex';
-          (chatBot as HTMLIFrameElement).style.display = 'none';
+          (imageFrame as HTMLImageElement).style.display = 'none';
           (popupContent as HTMLIFrameElement).className = 'popup-content-video';
           if (popupOverlay){
             popupOverlay.style.display = 'flex';
@@ -3254,7 +3284,18 @@ export function ConsolePage() {
         <div id="popupContent" className="popup-content-chat">
           <span id="closePopup" className="close-button"><X /></span>
           <iframe id="videoFrame" width="800" height="450" src="" allow="fullscreen" allowFullScreen style={{display: 'none'}}></iframe>
-          <iframe id="chatBot" width="100%" height="100%" src="http://localhost:4000/examples/audio-copilot" allow="fullscreen" allowFullScreen style={{display: 'none', borderRadius: '9px'}}></iframe> 
+          <img id="imageFrame" src="" alt="Image"
+                onDoubleClick={() => {
+                  const popupOverlay = document.getElementById('popupOverlay');
+                  const imageFrame = document.getElementById('imageFrame');                      
+                  if(popupOverlay.style.display === 'flex'){
+                    popupOverlay.style.display = 'none';
+                    (imageFrame as HTMLImageElement).style.display = 'none';
+                    (imageFrame as HTMLImageElement).src = '';
+                  }            
+                }}
+                style={{display: 'none'}}>                  
+          </img>
         </div>
       </div>
 
@@ -3474,20 +3515,17 @@ export function ConsolePage() {
                       }}
 
                       onMouseDown={(e) => {
-                        // 添加调试日志
-                        console.log('Mouse down, containerRefs:', containerRefs.current);
-                        console.log('Current pair index:', index);
-                        console.log('Current container ref:', containerRefs.current[`pair_${index}`]);
 
                         if(!e.ctrlKey) { 
                           setSelectionBox({ x: 0, y: 0, width: 0, height: 0, pairIndex: 0 });
                           return;
                         }else { 
+                          //if(!isConnected){connnectRealtimeAPI();return;}
                           document.body.style.userSelect = 'none'; // Prevent text selection
                         }
 
                         //document.body.style.userSelect = 'none'; // Prevent text selection
-                        const rect = e.currentTarget.getBoundingClientRect();
+                        //const rect = e.currentTarget.getBoundingClientRect();
                         selectionStart.current = { 
                           x: e.clientX, 
                           y: e.clientY 
@@ -3718,6 +3756,7 @@ export function ConsolePage() {
                   icon={isPlaying ? Pause : Play}
                   buttonStyle={'regular'}
                   onClick={toggleAudio}
+                  disabled={isAudioExisting() ? false : true}
                   className='button'
           />
           <div className="tooltip"  style={{display: isCaptionVisible? 'none' : 'flex'}}>
