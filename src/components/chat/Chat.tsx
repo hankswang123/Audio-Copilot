@@ -97,6 +97,8 @@ const UserMessage = ({ text }: { text: string }) => {
     if (popupOverlay){
       popupOverlay.style.display = 'flex';
       (imageFrame as HTMLImageElement).style.display = 'flex';
+      (imageFrame as HTMLImageElement).style.width = '100%';
+      (imageFrame as HTMLImageElement).style.height = '100%';
       (videoFrame as HTMLIFrameElement).style.display = 'none';
     }
   }  
@@ -115,21 +117,19 @@ const UserMessage = ({ text }: { text: string }) => {
     case "image":
       return <div className={styles.userMessage}>
               <img src={text} alt="Captured Element"               
-                   onDoubleClick={() => handleImgDoubleClick(text)}
-                  style={{
-                    //maxWidth: "300px",
-                    cursor: "pointer",
-                    border: "1px solid #ccc",
-                  }} />
+                   //onDoubleClick={() => handleImgDoubleClick(text)}
+                   style={{
+                      //cursor: "pointer",
+                      border: "1px solid #ccc",
+                   }} />
              </div>
     default:
       return null;
   }   
-
 };
 
 const AssistantMessage = ({ text }: { text: string }) => {
-
+  const [showPrompt, setShowPrompt] = useState(false);
   const preprocessText = (text: string) => {
     if (!text.includes('<iframe') && !text.includes('</iframe>')) {
       return text.replace(/\n/g, '<br />');
@@ -148,35 +148,39 @@ const AssistantMessage = ({ text }: { text: string }) => {
     if (popupOverlay){
       popupOverlay.style.display = 'flex';
       (imageFrame as HTMLImageElement).style.display = 'flex';
+      (imageFrame as HTMLImageElement).style.width = '670px';
+      (imageFrame as HTMLImageElement).style.height = '670px';
       (videoFrame as HTMLIFrameElement).style.display = 'none';
     }
   }
 
   return (  
     <div className={styles.assistantMessage}>
-	    <Markdown rehypePlugins={[rehypeRaw]}         components={{
-          img: ({ src, alt }) => (
-            <img
-              src={src}
-              alt={alt}
-              onDoubleClick={() => handleImgDoubleClick(src)}
-              style={{
-                //maxWidth: "300px",
-                cursor: "pointer",
-                border: "1px solid #ccc",
-              }}
-            />
-          ),
+	    <Markdown rehypePlugins={[rehypeRaw]}         
+                components={{
+                              img: ({ src, alt, title }) => (
+                                <>
+                                  <div style={{position: "relative", display: "inline-block"}}>
+                                    <img
+                                      src={src}
+                                      alt={alt}
+                                      //title={title}
+                                      onDoubleClick={() => handleImgDoubleClick(src)}
+                                      style={{
+                                        cursor: "pointer",
+                                        border: "1px solid #ccc",
+                                      }}
+                                    />                                              
+                                    <div onClick={() => {setShowPrompt(!showPrompt);}} style={{position: "absolute", bottom: "5px", right: "0px",backgroundColor: showPrompt ? "lightgray" : "gray", width: '100px', height:"20px", borderRadius: '4px', cursor:'pointer',textAlign: "center"}}>
+                                      {showPrompt ? "Hide Prompt" : "Show Prompt"}                    
+                                    </div>
+                                  </div>
+                                  <div style={{display: showPrompt ? 'flex' : 'none'}}>{title}</div>
+                                </>
+                              ),
         }}>{preprocessText(text)}</Markdown>
     </div>    
   );
-  
-
-  /* original code
-    <div className={styles.assistantMessage}>
-	    <Markdown rehypePlugins={[rehypeRaw]}>{preprocessText(text)}</Markdown>
-    </div>    
-  */ 
 };
 
 const ReadAloudMessage = ({ text }: { text: string }) => {

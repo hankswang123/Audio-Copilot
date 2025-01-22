@@ -118,7 +118,8 @@ tbd: not work as expected!!!
 
 .assistantMessage img {
   max-width: 100%;
-  margin: 8px 0px 8px 0px;
+  /*margin: 8px 0px 8px 0px;*/
+  margin: 0px 0px 0px 0px;
   border-radius: 8px;
 }
 
@@ -128,6 +129,13 @@ tbd: not work as expected!!!
   /*
   color: #fff;
   background-color: #000;*/
+}
+
+.promptBG{
+  background: #f0f0f0;
+  &:hover {
+    background: #696969;
+  }  
 }
 
 .userMessage img {

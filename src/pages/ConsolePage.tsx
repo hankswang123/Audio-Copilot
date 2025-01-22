@@ -198,6 +198,30 @@ export function ConsolePage() {
     pairIndex: 0  // 添加初始 pairIndex
   });
 
+  // Display a speaker on the left top of each PDF page
+  const SpeakerOnLT = ({ containerRef }) => {
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    
+    return (
+      <div
+        //ref={selectionRef}
+        style={{
+          position: 'absolute', // 改回 absolute
+          left: `${containerRect.left}px`, // 使用相对于容器的坐标
+          top: `${containerRect.top}px`,
+          width: `${20}px`,
+          height: `${10}px`,
+          border: '2px solid #0095ff',
+          //border: isSelecting ? '2px solid #0095ff' : 'none', // 只在选择时显示边框
+          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          pointerEvents: 'none',
+          zIndex: 9999,
+        }}
+      />
+    );
+  };  
+
   // Screenshot Selection Area
   const SelectionOverlay = ({ box, containerRef }) => {
     if (!box || (!isSelecting && box.width === 0 && box.height === 0)) return null;
@@ -240,12 +264,12 @@ export function ConsolePage() {
     const menu = document.createElement('div');
     menu.style.position = 'fixed';
 
-    menu.style.left = `${box.x + box.width - 5}px`;  // 改为选区右边
-    menu.style.top = `${box.y + box.height}px`;  // 保持在选区底部  
+    menu.style.left = `${box.x + box.width - 6}px`;  // 改为选区右边
+    menu.style.top = `${box.y + box.height + 1}px`;  // 保持在选区底部  
     menu.style.backgroundColor = 'white';
     menu.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
     menu.style.borderRadius = '4px';
-    menu.style.padding = '8px';
+    menu.style.padding = '6px';
     menu.style.zIndex = '1001';
     menu.style.transform = 'translate(-100%, 0)'; // 向左偏移菜单自身的宽度  
 
@@ -1637,17 +1661,23 @@ export function ConsolePage() {
     }*/
 
     const response: Response = await fetch(`http://localhost:3001/api/image_gen?magzine=${encodeURIComponent(newMagzine)}&word=${(word)}`);    
-    const imgURL = await response.json();
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const image: any = await response.json();      
+    const imgURL = image.imgURL;
+    const prompt = image.prompt;    
     console.log(imgURL);
     //localStorage.setItem(`tmp::${word}`, imgURL);
     
     if(imgURL.includes(' ')){
-      await chatRef.current.updateGenImage(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
+      await chatRef.current.updateGenImage(`![Image Could not be loaded](${encodeURIComponent(imgURL)}  "${prompt}")`);
     }else{
       //with request with timestamp parameter will lead to frontpage refresh after image generated is saved in backend
       //await chatRef.current.updateImage(`![Image Could not be loaded](${imgURL}?t=${Date.now()})`);
       //await chatRef.current.updateGenImage(`![Image Could not be loaded](${imgURL})`);
-      await chatRef.current.updateGenImage(`![Image Could not be loaded](${encodeURIComponent(imgURL)})`);
+      await chatRef.current.updateGenImage(`![Image Could not be loaded](${encodeURIComponent(imgURL)} "${prompt}")`);
     }   
     
   }
@@ -1738,12 +1768,12 @@ export function ConsolePage() {
         };
       }
       
+      /*
       let selectionTxt = getSelectedText().trim();
       //readAloudLi.onclick = () => selectionTTS(selectedText);
       if(readAloudLi.style.display === 'block'){
-        //readAloudLi.onclick = () => {chatRef.current.chatFromExternal(`Read Aloud about '${selectedText}' and explain to me its chinese meaning and provide to two usage examples in English.`);};
         readAloudLi.onclick = () => {chatRef.current.chatFromExternal(`Read Aloud about '${selectedText}' and explain to me its chinese meaning  and provide to two usage examples in English.`);};
-      }
+      }*/
       
       if(explainLi.style.display === 'block'){
         explainLi.onclick = () => {chatRef.current.chatFromExternal(`Explain '${selectedText}'`);};
@@ -3294,7 +3324,7 @@ export function ConsolePage() {
                     (imageFrame as HTMLImageElement).src = '';
                   }            
                 }}
-                style={{display: 'none'}}>                  
+                style={{display: 'none', borderRadius: '8px'}}>                  
           </img>
         </div>
       </div>
@@ -3591,6 +3621,7 @@ export function ConsolePage() {
                           containerRef={containerRefs.current[`pair_${index}`]}
                         />
                       )}
+                      {/*<SpeakerOnLT containerRef={containerRefs.current[`pair_${index}`]} />*/}
                   </div>);
               })}
             </Document>

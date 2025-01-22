@@ -1,3 +1,5 @@
+help: This file stores the scripts of the audio file as following format:
+----------------------------------------------------------------------------------------
 00:00 
  Welcome to our deep dive, everyone. Today we're going to be talking all about animals.
 

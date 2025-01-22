@@ -87,15 +87,14 @@ app.get("/api/videos", async (req, res) => {
 const promptGen = async (word) => { 
     try{
         const openai = new OpenAI({
-            //model: 'gpt-4o',
             apiKey: process.env.OPENAI_API_KEY, 
             });
 
         const response = await openai.chat.completions.create(  {  
             model: 'gpt-4o',  
             messages: [
-            { role: 'system', content: 'Create a detailed and imaginative prompt for image generation based on a given word. If the word is a noun, describe its scenario clearly. If it is a non-noun word, use your imagination to depict a vivid scene or concept related to the word.' },
-            { role: 'user', content: word },
+                { role: 'system', content: 'Create a detailed and imaginative prompt for image generation based on a given word using simple English words as much as possible instead of complicated ones. If the given word is a noun, describe its scenario clearly. If it is a non-noun word, use your imagination to depict a vivid scene or concept related to the word.' },
+                { role: 'user', content: word },
             ],
             max_tokens: 70,
             temperature: 0.7,
@@ -116,19 +115,27 @@ app.get("/api/image_gen", async (req, res) => {
     try {
         // dirPath = path.join(__dirname, `public/wordCard/${magzine}`);
         const dirPath = path.join(__dirname, `public/wordCard`);
-        const filePath = path.join(dirPath, `${word}.png`);        
+        const imgPath = path.join(dirPath, `${word}.png`);        
+        const promptPath = path.join(dirPath, `${word}.txt`);
 
         // Ensure the directory exists
         if (!fs.existsSync(dirPath)) {
             fs.mkdirSync(dirPath, { recursive: true });
         }
 
+        //const prompt = await promptGen(word); 
         // Check if the file already exists
-        if (fs.existsSync(filePath)) {
-            //res.json(`/wordCard/${magzine}/${word}.png`);
-            res.json(`/wordCard/${word}.png`);
+        if (fs.existsSync(imgPath)) {
+            if(fs.existsSync(promptPath)){
+                const savedPrompt = await fs.promises.readFile(promptPath, 'utf-8');
+                res.json({imgURL: `/wordCard/${word}.png`, prompt: `${savedPrompt}`});
+            }else{
+                const addPrompt = await promptGen(word); 
+                await fs.promises.writeFile(promptPath, addPrompt);
+                res.json({imgURL: `/wordCard/${word}.png`, prompt: `${addPrompt}`});
+            }            
             return;
-        }        
+        }
 
         const prompt = await promptGen(word); 
         console.log('generted prompt by openAI:', prompt);
@@ -154,9 +161,9 @@ app.get("/api/image_gen", async (req, res) => {
 
         const imgUrl = imgRes.data[0].url;
         const imgResponse = await axios.get(imgUrl, { responseType: 'arraybuffer' });
-        await fs.promises.writeFile(filePath, imgResponse.data);
-        //res.json(`/wordCard/${magzine}/${word}.png`);        
-        res.json(`/wordCard/${word}.png`);        
+        await fs.promises.writeFile(imgPath, imgResponse.data);
+        await fs.promises.writeFile(promptPath, finalPrompt);
+        res.json({imgURL: `/wordCard/${word}.png`, prompt: `${finalPrompt}`});
 
         // 使用 Promise 处理图片下载
         /*
