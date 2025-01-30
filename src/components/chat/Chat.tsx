@@ -8,13 +8,16 @@ import { AssistantStreamEvent } from "openai/resources/beta";
 import { RequiredActionFunctionToolCall } from "openai/resources/beta/threads/runs/runs";
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
 import { RealtimeClient } from '@openai/realtime-api-beta';
+import { ZPRealtimeClient, ZPItemType } from '../../lib/zhipuRealtime/client.js';
+type ClientType = RealtimeClient | ZPRealtimeClient;
+type RealtimeClientItemType = ItemType | ZPItemType;
 
 import { Button } from '../button/Button';
 import { Mic, MicOff, Send, Plus, Minus, ArrowLeft, ArrowRight } from 'react-feather';
 import { openDB } from 'idb';
 //import { pdfFilePath, audioFilePath } from '../filePaths.js';
 
-/*
+
 async function initializeDB() {
   return openDB('my-database', 1, {
     upgrade(db) {
@@ -40,7 +43,7 @@ async function getData(key) {
   const db = await initializeDB(); // Ensure database and object store are initialized
   return await db.get('keyval', key);
 }
-*/
+
 
 let apiKey = localStorage.getItem('tmp::voice_api_key');
 if (apiKey === '') {
@@ -72,7 +75,9 @@ export const openai = new OpenAI({
 type MessageProps = {
   role: "user" | "assistant" | "code" | "audio" | "read_aloud";
   text: string;
-  items: ItemType[];
+  items: RealtimeClientItemType[];
+  //items: ItemType[];
+  //items: ZPItemType[];
 };
 
 const UserMessage = ({ text }: { text: string }) => {
@@ -128,6 +133,19 @@ const UserMessage = ({ text }: { text: string }) => {
   }   
 };
 
+const StructPrompt = ({ prompt }: { prompt: string }) => {
+  const sentences = prompt.split('.').filter(sentence => sentence.trim() !== '');
+
+  return  (
+      <ul>
+        {sentences.map((sentence, index) => (
+          <li key={index}>
+            {sentence.trim()+'.'}
+          </li>
+        ))}
+      </ul> );
+};
+
 const AssistantMessage = ({ text }: { text: string }) => {
   const [showPrompt, setShowPrompt] = useState(false);
   const preprocessText = (text: string) => {
@@ -164,18 +182,19 @@ const AssistantMessage = ({ text }: { text: string }) => {
                                     <img
                                       src={src}
                                       alt={alt}
-                                      //title={title}
                                       onDoubleClick={() => handleImgDoubleClick(src)}
                                       style={{
                                         cursor: "pointer",
                                         border: "1px solid #ccc",
                                       }}
                                     />                                              
-                                    <div onClick={() => {setShowPrompt(!showPrompt);}} style={{position: "absolute", bottom: "5px", right: "0px",backgroundColor: showPrompt ? "lightgray" : "gray", width: '100px', height:"20px", borderRadius: '4px', cursor:'pointer',textAlign: "center"}}>
+                                    <div onClick={() => {setShowPrompt(!showPrompt);}} style={{userSelect: "none", position: "absolute", bottom: "5px", right: "0px",backgroundColor: showPrompt ? "gray" : "lightgray", width: '100px', height:"20px", borderRadius: '4px', cursor:'pointer',textAlign: "center"}}>
                                       {showPrompt ? "Hide Prompt" : "Show Prompt"}                    
                                     </div>
                                   </div>
-                                  <div style={{display: showPrompt ? 'flex' : 'none'}}>{title}</div>
+                                  <div style={{display: showPrompt ? 'flex' : 'none', border: "1px solid #ccc", borderRadius: '4px', padding: '5px', marginTop: '5px', backgroundColor: 'lightgray'}}>
+                                    <StructPrompt prompt={title} />
+                                  </div>
                                 </>
                               ),
         }}>{preprocessText(text)}</Markdown>
@@ -191,7 +210,9 @@ const ReadAloudMessage = ({ text }: { text: string }) => {
   );
 };
 
-const OriginalAudio = ({ align, itemId, items }: { align: string; itemId: string; items: ItemType[] }) => {
+const OriginalAudio = ({ align, itemId, items }: { align: string; itemId: string; items: RealtimeClientItemType[] }) => {
+//const OriginalAudio = ({ align, itemId, items }: { align: string; itemId: string; items: ItemType[] }) => {
+//const OriginalAudio = ({ align, itemId, items }: { align: string; itemId: string; items: ZPItemType[] }) => {  
   return (
     <div style={{ alignSelf: align }} >
       {items
@@ -207,9 +228,11 @@ const OriginalAudio = ({ align, itemId, items }: { align: string; itemId: string
       ))}
     </div>  
   );
-}
+};
 
-const AudioMessage = ({ itemId, items }: { itemId: string; items: ItemType[] }) => {
+const AudioMessage = ({ itemId, items }: { itemId: string; items: RealtimeClientItemType[] }) => {
+//const AudioMessage = ({ itemId, items }: { itemId: string; items: ItemType[] }) => {
+//const AudioMessage = ({ itemId, items }: { itemId: string; items: ZPItemType[] }) => {  
   const tempItem = items.find((conversationItem) => conversationItem.id === itemId);
 
   // Check if tempItem exists before accessing its properties
@@ -273,7 +296,9 @@ type ChatProps = {
   functionCallHandler?: (
     toolCall: RequiredActionFunctionToolCall
   ) => Promise<string>;
-  realtimeClient?: RealtimeClient;
+  realtimeClient?: ClientType;
+  //realtimeClient?: RealtimeClient;
+  //realtimeClient?: ZPRealtimeClient;
   getIsMuted?: () => boolean;
 };
 
@@ -284,8 +309,10 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
   const [messages, setMessages] = useState<{ role: "user" | "assistant" | "code" | "audio" | "read_aloud"; text: string }[]>([]);
   const [inputDisabled, setInputDisabled] = useState(false);
   const [threadId, setThreadId] = useState("");
-  const threadIdRef = useRef<string | null>(null);
-  const [items, setItems] = useState<ItemType[]>([]);
+  const threadIdRef = useRef<string | null>(null);  
+  const [items, setItems] = useState<RealtimeClientItemType[]>([]);
+  //const [items, setItems] = useState<ItemType[]>([]);
+  //const [items, setItems] = useState<ZPItemType[]>([]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [isChecked, setIsChecked] = useState(true);
 
@@ -315,8 +342,10 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
     saveItems(); // Call the async function
   }, [items]);  
   */
-/*
-  const [items, setItems] = useState<ItemType[]>(() => {
+
+  /*
+  //const [items, setItems] = useState<ItemType[]>(() => {
+  const [items, setItems] = useState<RealtimeClientItemType[]>(() => {
     // Load initial state from localStorage if available
     const savedItems = localStorage.getItem("items");
     return savedItems ? JSON.parse(savedItems) : [];
@@ -327,7 +356,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
     localStorage.setItem("items", JSON.stringify(items));
   }, [items]);  */
 
-/*  
+/*
   useEffect(() => {
     const loadMessages = async () => {
       try {
@@ -351,8 +380,8 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
     };
   
     saveMessages(); // Call the async function
-  }, [messages]);
-*/
+  }, [messages]);*/
+
   /*
   const [messages, setMessages] = useState<{ 
     role: "user" | "assistant" | "code" | "audio"; 
@@ -459,7 +488,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, items]);
 
   const getThreadId = async () => {
     /*
@@ -743,7 +772,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
           value={userInput}
           //onChange={(e) => setUserInput(e.target.value)}
           onChange={handleInputOnChange}
-          placeholder={realtimeClient.isConnected()? "Ask me anything..." : "Connect to Ask!"}
+          placeholder={realtimeClient.isConnected()? "Ask me anything..." : "Connect to ask anything!"}
           disabled={realtimeClient.isConnected() ? false : true}
           style={{marginRight: '1px', border: 'none', outline: 'none'}}
         />  

@@ -16,15 +16,19 @@ const LOCAL_RELAY_SERVER_URL: string =
 //import { pdfFilePath, audioFilePath } from '../filePaths.js'; // Import the file paths
 //import nodemailer from 'nodemailer';
 //import EventLog from "../components/webrtc/EventLog";
-//import { cp } from 'fs';
 
 import React, { useEffect, useRef, useCallback, useState } from 'react';
+
 import { RealtimeClient } from '@openai/realtime-api-beta';
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
+import { ZPRealtimeClient, ZPItemType } from '../lib/zhipuRealtime/client.js';
+type ClientType = RealtimeClient | ZPRealtimeClient;
+type RealtimeClientItemType = ItemType | ZPItemType;
+
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
 import { WavRenderer } from '../utils/wav_renderer';
 
-import {AlignCenter, Youtube, Key, Layout, Book, BookOpen, TrendingUp, X, Zap, Edit, Play, Pause, Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight, Settings, Repeat, SkipBack, UserPlus, ZoomOut, ZoomIn, User, Volume } from 'react-feather';
+import {AlignCenter, Key, Layout, Book, BookOpen, TrendingUp, X, Zap, Edit, Play, Pause, Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight, Settings, Repeat, SkipBack, UserPlus, ZoomOut, ZoomIn, User, Volume } from 'react-feather';
 
 import { Document, Page } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -35,10 +39,9 @@ import Chat, {openai} from '../components/chat/Chat';
 import PdfViewerWithIcons from '../components/pdf/PdfViewerWithIcons';
 import { Button } from '../components/button/Button';
 import SessionControls from "../components/webrtc/SessionControls";
-//import { ModuleResolutionKind } from 'typescript';
-//import { OpenAI } from "openai";
-
 import html2canvas from 'html2canvas';
+
+//import WebSocket from "ws";
 
 /**
  * Type for all event logs
@@ -84,6 +87,30 @@ export function ConsolePage() {
   const wavStreamPlayerRef = useRef<WavStreamPlayer>(
     new WavStreamPlayer({ sampleRate: 24000 })
   );
+
+  const isRealtimeClient = true;
+  //const isRealtimeClient = false;
+  const clientRef = useRef<ClientType>(
+    isRealtimeClient ?
+    new RealtimeClient(
+      LOCAL_RELAY_SERVER_URL
+        ? { url: LOCAL_RELAY_SERVER_URL }
+        : {
+            apiKey: apiKey,
+            dangerouslyAllowAPIKeyInBrowser: true,
+          }
+    ) :    
+    new ZPRealtimeClient(
+      LOCAL_RELAY_SERVER_URL
+        ? { url: LOCAL_RELAY_SERVER_URL }
+        : {
+            apiKey: apiKey,
+            dangerouslyAllowAPIKeyInBrowser: true,
+          }
+    )
+  );  
+
+  /*
   const clientRef = useRef<RealtimeClient>(
     new RealtimeClient(
       LOCAL_RELAY_SERVER_URL
@@ -93,7 +120,20 @@ export function ConsolePage() {
             dangerouslyAllowAPIKeyInBrowser: true,
           }
     )
-  );
+  );*/
+
+
+  /*
+  const clientRef = useRef<ZPRealtimeClient>(
+    new ZPRealtimeClient(
+      LOCAL_RELAY_SERVER_URL
+        ? { url: LOCAL_RELAY_SERVER_URL }
+        : {
+            apiKey: apiKey,
+            dangerouslyAllowAPIKeyInBrowser: true,
+          }
+    )
+  );  */
 
   /**
    * References for
@@ -119,7 +159,9 @@ export function ConsolePage() {
    * - memoryKv is for set_memory() function
    * - coords, marker are for get_weather() function
    */
-  const [items, setItems] = useState<ItemType[]>([]);
+  const [items, setItems] = useState<RealtimeClientItemType[]>([]);
+  //const [items, setItems] = useState<ItemType[]>([]);
+  //const [items, setItems] = useState<ZPItemType[]>([]);
   const [realtimeEvents, setRealtimeEvents] = useState<RealtimeEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
@@ -158,7 +200,6 @@ export function ConsolePage() {
   const rightRef = useRef<HTMLDivElement | null>(null);
 
   const [numPages, setNumPages] = useState<number>();
-  //const [pageNumber, setPageNumber] = useState<number>(1);
   const containerRef = useRef(null); // Ref for the scrollable container
   const pageRefs = useRef<React.RefObject<HTMLDivElement>[]>([]); // Array of refs for each page
   const [scale, setScale] = useState(1); // Zoom level
@@ -186,7 +227,6 @@ export function ConsolePage() {
   const [isSelecting, setIsSelecting] = useState(false);
   const selectionStart = useRef({ x: 0, y: 0 });
   const selectionRef = useRef(null);
-  // 添加容器引用
   const containerRefs = useRef({}); // 用于存储每个页面对的容器引用
 
 // 修改初始状态，添加 pairIndex
@@ -201,15 +241,17 @@ export function ConsolePage() {
   // Display a speaker on the left top of each PDF page
   const SpeakerOnLT = ({ containerRef }) => {
 
-    const containerRect = containerRef.current.getBoundingClientRect();
+    //const containerRect = containerRef.current.getBoundingClientRect();
     
     return (
       <div
         //ref={selectionRef}
         style={{
           position: 'absolute', // 改回 absolute
-          left: `${containerRect.left}px`, // 使用相对于容器的坐标
-          top: `${containerRect.top}px`,
+          //left: `${containerRect.left}px`, // 使用相对于容器的坐标
+          //top: `${containerRect.top}px`,
+          top: '10px',
+          right: '10px',
           width: `${20}px`,
           height: `${10}px`,
           border: '2px solid #0095ff',
@@ -259,7 +301,7 @@ export function ConsolePage() {
     }
   }, [renderedPages])  
 
-  // screenshot menu poupup after mouseup
+  // screenshot menu poupup after selection mouseup
   const showScreenshotMenu = (box) => {
     const menu = document.createElement('div');
     menu.style.position = 'fixed';
@@ -484,28 +526,6 @@ export function ConsolePage() {
     audioCaptions.current = newAudioCaptions; // Sync ref with the updated state
   }, [newAudioCaptions]);  
 
-  const isAudioExisting = async () => {
-    try {
-      const response = await fetch(`./play/${newMagzine}/${newMagzine}.wav`, {
-        method: 'HEAD', // Or 'GET' depending on your needs
-      });
-  
-      if (response.ok) {
-        console.log('Audio exists!');
-        return true;
-      } else if (response.status === 404) {
-        console.log('Audio not found.');
-        return false;
-      } else {
-        console.log(`Unexpected status: ${response.status}`);
-        return false;
-      }
-    } catch (error) {
-      console.error('Error checking resource:', error);
-      return false;
-    }  
-  };
-
   // Update PDF file path, audio file path and audio captions when a new magzine is selected
   const handleSelectChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newMagzine = event.target.value;
@@ -527,7 +547,6 @@ export function ConsolePage() {
     setNewInstructions( newInstructions );
     const client = clientRef.current;
     client.updateSession({ instructions: newInstructions });     
-
   };  
 
   // Some times isConnected could not reflect the actual connection status due to the delay of the state update
@@ -781,23 +800,6 @@ export function ConsolePage() {
 
   };   
 
-  // Handle search videos from selection context menu
-  const selectionSearchVideos = async (input: string) => { 
-
-    chatRef.current.chatFromExternal(`Search video about ${input}`);    
-
-    /*
-    const client = clientRef.current;
-    if(client.isConnected()){
-        client.sendUserMessageContent([
-        {
-          type: `input_text`,
-          text: `Search video about ${input}`,
-        },
-      ]);  
-    }  */
-  }  
-
   const selectionTalkAbout = async (input: string) => {
     const client = clientRef.current;
     if(client.isConnected()){
@@ -812,7 +814,11 @@ export function ConsolePage() {
         muteBtnRef.current.click();
 
         hideContextMenu();
-        openChatbot();
+        //openChatbot();
+        const openRightArrow = document.getElementById('openRightArrow');
+        if(openRightArrow){
+          openRightArrow.click();
+        }        
       }
     }
   }
@@ -859,7 +865,73 @@ export function ConsolePage() {
     }
   }
 
-  // Test new connection to Realtime API by WebRTC
+  //--- Test new connection to zhipu Realtime API  ---  
+  const getJWT = async () => {
+    const tokenResponse = await fetch("http://localhost:3001/api/zhipu/jwt");
+    //const data = await tokenResponse.json();
+    const jwt = await tokenResponse.text();
+    //const jwt = data.client_secret.value;
+    console.log(jwt);
+    return jwt;    
+  }  
+
+  // Refer: https://bigmodel.cn/dev/api/rtav/GLM-Realtime
+  const test_zhipu_realtime1 = async () => {
+
+    const WebSocket = globalThis.WebSocket;
+    // local relay server(wss: websocket server): http://localhost:8081
+    // 
+    const ws = new WebSocket("http://localhost:8081");
+    ws.addEventListener('message', (event) => {
+      const message = JSON.parse(event.data);
+      console.log(message);
+      //this.receive(message.type, message);
+    });   
+
+    ws.onopen = () => {
+      console.log("Connected to local relay server: http://localhost:8081");
+      ws.send(JSON.stringify('hello, this is a test'));
+    };     
+
+  }
+
+  const test_zhipu_realtime = async () => {
+      try{
+        await fetch("http://localhost:3001/api/zhipu/rt");
+        /*
+        const jwtToken = await getJWT();
+        const wsURL = "wss://open.bigmodel.cn/api/paas/v4/realtime";
+
+        if (globalThis.WebSocket)
+        {
+          const WebSocket = globalThis.WebSocket;
+          
+          /*
+          const websocket = new WebSocket(wsURL, [
+            'Authorization: Bearer ' + jwtToken,
+          ]);*/
+
+          //const websocket = new WebSocket(wsURL, ['Authorization: Bearer ' + jwtToken,]); 
+          //websocket.send(`Authorization: Bearer "${jwtToken}"`);
+
+          // Add the Authorization header during the WebSocket handshake (not supported natively)
+          //websocket.onopen = () => {
+          //  console.log("Connected to server.");
+
+            // Send the token as the first message if the server expects it this way
+            //websocket.send(JSON.stringify({ type: "auth", token: jwtToken }));
+            //websocket.send(`Authorization: Bearer "${jwtToken}"`);
+          //};      
+        //}*/
+      }catch(error){
+        console.log("there is connection error during ws:" + error);
+      }  
+
+  }  
+
+  //--- Test new connection to zhipu Realtime API  ---
+
+  //--- Test new connection to Realtime API by WebRTC ---
   const getEphemeralKey = async () => {
     const tokenResponse = await fetch("http://localhost:3001/api/session");
     const data = await tokenResponse.json();
@@ -1039,7 +1111,7 @@ export function ConsolePage() {
       });
     }
   }, [dataChannel]);  
-// Test new connection to Realtime API by WebRTC  
+//--- Test new connection to Realtime API by WebRTC ---
 
   // Try to prevent zoom in/out event for the whole page
   // Status: logic not work yet
@@ -1112,8 +1184,6 @@ export function ConsolePage() {
 
   useEffect(() => {
     if (isMuteBtnDisabled) {
-      //setStartingText(`Turning on${'.'.repeat(dotCount)}`);
-      //setStartingText(`Connecting${'.'.repeat(dotCount)}`);
       if (dotCount === 0) {
         setStartingText(`Connect${'.'.repeat(dotCount)}` + '\u00A0\u00A0\u00A0');
       }
@@ -1128,6 +1198,30 @@ export function ConsolePage() {
       }            
     }
   }, [dotCount, isMuteBtnDisabled]);  
+
+  //tbd: why response.ok is always true even the audio file is not existing
+  // Check if the server has cache issue
+  const isAudioExisting = async () => {
+    try {
+      const response = await fetch(`./play/${newMagzine}/${newMagzine}.wav`, {
+        method: 'HEAD', // Or 'GET' depending on your needs
+      });
+  
+      if (response.ok) {
+        console.log('Audio exists!');
+        return true;
+      } else if (response.status === 404) {
+        console.log('Audio not found.');
+        return false;
+      } else {
+        console.log(`Unexpected status: ${response.status}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking resource:', error);
+      return false;
+    }  
+  };  
 
   // Load the audio file when the component mounts
   useEffect(() => {
@@ -1178,18 +1272,6 @@ export function ConsolePage() {
       }
     } 
   };     
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const menuInput = document.getElementById('menuInput') as HTMLInputElement | null;
-    if(menuInput && menuInput.value.trim()){ 
-      chatRef.current.chatFromExternal(menuInput.value.trim());
-      menuInput.value = '';
-
-      hideContextMenu();
-      openChatbot();
-    }
-  }
 
   const adjustCaptionFontSize = (adjustment: number) => { 
     const captionDisplay = document.getElementById('captionDisplay');
@@ -1628,8 +1710,7 @@ export function ConsolePage() {
     
   };
 
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
+  /*
   let imgURLCache = [];
   const hasKey = (key) => imgURLCache.some(obj => obj.hasOwnProperty(key));
   const getValueByKey = (key) => {
@@ -1640,13 +1721,20 @@ export function ConsolePage() {
     const newObj = {};
     newObj[key] = value;
     imgURLCache.push(newObj);
-  };
+  };*/
 
+  // Explain the selected word and generate an image by recraft.ai
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const explainAndShowImage = async (word) => {
-    openChatbot();
+    //openChatbot();
+    const openRightArrow = document.getElementById('openRightArrow');
+    if(openRightArrow){
+      openRightArrow.click();
+    }
     clientRef.current.updateSession({instructions: `Provide Chinese meaning, part of speech and English phonetic transcription two usage examples in English with also their chinese translation for the given word`});              
     chatRef.current.chatFromExternal(`'${word}'`);
     await sleep(1500);    
+    //restore the original instructions
     clientRef.current.updateSession({ instructions: instructions.current }); 
 
     /*
@@ -1660,7 +1748,8 @@ export function ConsolePage() {
       return;     
     }*/
 
-    const response: Response = await fetch(`http://localhost:3001/api/image_gen?magzine=${encodeURIComponent(newMagzine)}&word=${(word)}`);    
+    //Generate image by recraft.ai for the given word at the first time
+    const response: Response = await fetch(`http://localhost:3001/api/recraft/image?magzine=${encodeURIComponent(newMagzine)}&word=${(word)}`);    
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -1681,6 +1770,19 @@ export function ConsolePage() {
     }   
     
   }
+
+  // Handle the chat triggered from the context menu
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const menuInput = document.getElementById('menuInput') as HTMLInputElement | null;
+    if(menuInput && menuInput.value.trim()){ 
+      chatRef.current.chatFromExternal(menuInput.value.trim());
+      menuInput.value = '';
+
+      hideContextMenu();
+      openChatbot();
+    }
+  }  
 
   const getSelectedText = () => {
     const selection = window.getSelection();
@@ -1776,11 +1878,23 @@ export function ConsolePage() {
       }*/
       
       if(explainLi.style.display === 'block'){
-        explainLi.onclick = () => {chatRef.current.chatFromExternal(`Explain '${selectedText}'`);};
+        explainLi.onclick = () => {
+          const openRightArrow = document.getElementById('openRightArrow');
+          if(openRightArrow){
+            openRightArrow.click();
+          }          
+          chatRef.current.chatFromExternal(`Explain '${selectedText}'`);        
+        };
       }
 
       const searchVideosLi = document.getElementById('searchVideosLi');
-      searchVideosLi.onclick = () => {chatRef.current.chatFromExternal(`Search videos about '${selectedText}'`);};
+      searchVideosLi.onclick = () => {
+        const openRightArrow = document.getElementById('openRightArrow');
+        if(openRightArrow){
+          openRightArrow.click();
+        }        
+        chatRef.current.chatFromExternal(`Search videos about '${selectedText}'`);
+      };
 
       const talkAboutSelection = document.getElementById('talkAboutSelection');
       talkAboutSelection.onclick = () => selectionTalkAbout(selectedText);
@@ -1925,6 +2039,11 @@ export function ConsolePage() {
           e.preventDefault(); // Prevent default space bar action (scrolling)
           if (playPauseBtnRef.current) {
             playPauseBtnRef.current.click(); // Trigger the button click event
+
+            const wavStreamPlayer = wavStreamPlayerRef.current;
+            if(wavStreamPlayer){
+              wavStreamPlayer.askStop = true; 
+            } 
           }      
         }  
       } else if (e.code === 'Escape') {
@@ -2040,7 +2159,7 @@ export function ConsolePage() {
    */
   async function performGoogleSearch(query: string): Promise<Array<{ title: string, url: string }>> {
     try {
-      const response: Response = await fetch(`http://localhost:3001/api/news?q=${encodeURIComponent(query)}`);
+      const response: Response = await fetch(`http://localhost:3001/api/serp/news?q=${encodeURIComponent(query)}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -2174,7 +2293,7 @@ export function ConsolePage() {
    */
   async function performYoutubeSearch(query: string): Promise<Array<{ title: string, url: string }>> {
     try {
-      const response: Response = await fetch(`http://localhost:3001/api/videos?q=${encodeURIComponent(query)}`);
+      const response: Response = await fetch(`http://localhost:3001/api/serp/videos?q=${encodeURIComponent(query)}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -2762,18 +2881,19 @@ export function ConsolePage() {
         return  imageDescription;
 
       }
-    );       */         
+    );       */  
+    // Word Card: Explain the selected word       
     client.addTool(
       { 
         name: 'selection_analyze',
         description:
-          'Analyze the selection',
+          'Show word card',
         parameters: {
           type: 'object',
           properties: {
             selection: {
               type: 'string',
-              description: 'Selection to be used',
+              description: 'word selecteed',
             },           
           },
           required: ['selection'],
@@ -2781,7 +2901,9 @@ export function ConsolePage() {
       },
       async({ selection }: { selection: string }) => {
         //return await analyzeImage(imgURL);
-        return  'This is a beautiful image';
+        explainAndShowImage(selection);
+        return { ok: true };
+        //return  'This is a beautiful image';
       }
     );           
     // Voice control the on-going playback
@@ -3198,12 +3320,12 @@ export function ConsolePage() {
 
   const checkConnection = () => {
     // Replace this with your actual connection check logic
-    console.log('Checking connection...');
+    //console.log('Checking connection...');
     // Example: Check if the realtime client is connected
     if (clientRef.current && clientRef.current.isConnected()) {
-      console.log('Connected');
+      //console.log('Connected');
     } else {
-      console.log('Not connected');
+      //console.log('Not connected');
       setIsConnected(false);      
       // if connection is lost anaccidentally, recorder processor will not be null
       //  => disconnect and reset the conversation state
@@ -3451,10 +3573,11 @@ export function ConsolePage() {
           <div className='magzine-title' style={{height: '25px', justifyContent: 'center', marginLeft: 'auto', marginRight: 'auto', userSelect: 'none'}}><img id='imgRecraft' src='./resource/ngl.png' width="70px" height="20px" style={{marginRight: "5px"}}></img>{newMagzine}
           </div>                    
           <Button
-            style={{height: '10px', display: 'none'}}
+            style={{height: '10px', display: 'flex'}}
             label={'WebRTC Test'}
+            onClick={test_zhipu_realtime1}
             //onClick={test_webrtc}
-            onClick={showConversation}
+            //onClick={showConversation}
           />
           <div className="right-buttons" style={{userSelect: 'none'}}>
             {/*<div style={{ fontSize: '1em' }}>{isConnected ? ( <> Copilot: <span className="highlightgreen">On</span> </> ) : (isMuteBtnDisabled ? startingText : (isConnectionError ? ( <><span className="highlightred">Error Occurred!</span></> ) : ( <> Copilot: <span className="highlightred">Off</span> </> )) )}</div> */}
@@ -3605,10 +3728,11 @@ export function ConsolePage() {
                             margin: 0,
                           }}
                         >
+                          {/*<SpeakerOnLT containerRef={containerRefs.current[`pair_${index}`]} /> */}
                           <Page
                             pageNumber={pageNumber}
                             renderTextLayer={true}
-                            renderAnnotationLayer={false}
+                            renderAnnotationLayer={true}
                             onLoadSuccess={() => onPageLoadSuccess({ pageNumber })}
                             loading={<p>Loading page {pageNumber}...</p>}
                             width={isTwoPageView ? 430 : 860}

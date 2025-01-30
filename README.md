@@ -4,7 +4,7 @@ Audio Copilot enables the interaction with content during playback on-going. It 
 ## Features/Tests TBD
 - Check how to integrate some OpenAI compatiable Free Models API
 - Logic to generate new Assistant ID when the existing assistant expires
-- Test [WebRTC API Integration](https://platform.openai.com/docs/guides/realtime-webrtc)
+- Test [WebRTC API Integration](https://platform.openai.com/docs/guides/realtime-webrtc), the [openai-realtime-agents](https://github.com/openai/openai-realtime-agents) is a good example to learn, which use WebRTC to connect to realtime model
 - Model settings, e.g. voice to be used, before launching a conversation
 - Launch two realtime api instants to talk with each other to implment the NotebookLM audio overview effect
 - Test more features of different models in OpenAI
@@ -22,8 +22,9 @@ Audio Copilot enables the interaction with content during playback on-going. It 
 ### Whole process
 - Step 1 - Preapre the PDF file from [National Geographic Little Kids](https://magazinelib.com/?s=national+geographic+little+kids) or any other PDF files
 - Step 2 - Generate the podcast by uploading PDF to [NotebookLM](https://notebooklm.google.com/)
-- Step 3 - Generate the scripts by uplodading podcast to [Fireflies](https://app.fireflies.ai/), [Tongyi->Efficiency](https://tongyi.aliyun.com/efficiency) or [Google AI Studio](https://aistudio.google.com/prompts/new_chat)
-- Step 4 - User could engage an dicussion by Audio Copilot during listening podcast and reading the magzine.
+- Step 3 - Generate the scripts by uploading podcast to [Fireflies](https://app.fireflies.ai/), [Tongyi->Efficiency](https://tongyi.aliyun.com/efficiency) or [Google AI Studio](https://aistudio.google.com/prompts/new_chat)
+- Step 4 - User could engage an realtime dicussion by Audio Copilot during listening podcast and reading the magzine.
+- Step 5 - Additional features: analyze selected screenshot, word card...
 
 ## API Key required
 - [OpenAI API Key](https://platform.openai.com/api-keys) - for Realtime API calling
