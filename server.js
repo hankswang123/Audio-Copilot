@@ -91,6 +91,34 @@ app.get("/api/serp/videos", async (req, res) => {
     }
 });
 
+// Call deepseek API to chat
+app.get("/api/deepseek/chat", async (req, res) => {
+    try {
+        console.log('deepseek chat is called');
+        const { q } = req.query;
+
+        const deepseek = new OpenAI({
+            baseURL: process.env.DEEPSEEK_BASE_URL,
+            apiKey: process.env.DEEPSEEK_API_KEY, 
+            });
+
+        const response = await deepseek.chat.completions.create(  {  
+            model: 'deepseek-chat',  
+            messages: [
+                { role: 'system', content: '你是一个百科全书，用有趣的方式回答用户提出的各种问题.' },
+                { role: 'user', content: q},
+            ],
+        });
+
+        console.log(response.choices[0].message.content);
+
+        res.json(response.choices[0].message.content);  
+    } catch (error) {
+        console.error("Detailed error:", error);
+        res.status(600).json({ error: 'Failed to get response from deepseek', details: error.message });
+    }
+});
+
 //Deepseek: Generate Prompt for word card image generation
 const promptGen_ds = async (word) => { 
     try{
@@ -137,6 +165,30 @@ const promptGen = async (word) => {
         return null;
     }
 }
+
+// Call recraft.ai API to generate image based on the word
+app.get("/api/audio/check", async (req, res) => {
+    const { magzine, word } = req.query;
+
+    try {
+        // dirPath = path.join(__dirname, `public/wordCard/${magzine}`);
+        const dirPath = path.join(__dirname, `public/play/${magzine}`);
+        const audioPath = path.join(dirPath, `${magzine}.wav`);
+
+        // Check if the audio file already exists
+        if (fs.existsSync(audioPath)) {
+            res.json({audioExisting: 'true'});
+        } else{res.json({audioExisting: 'false'});}
+
+    } catch(error) {
+        console.error('Error checking audio file:', error);
+        res.status(500).json({ 
+            error: 'Failed to check audio file existance', 
+            details: error.message 
+        });
+    }     
+});
+
 
 // Call recraft.ai API to generate image based on the word
 app.get("/api/recraft/image", async (req, res) => {

@@ -28,7 +28,7 @@ type RealtimeClientItemType = ItemType | ZPItemType;
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
 import { WavRenderer } from '../utils/wav_renderer';
 
-import {AlignCenter, Key, Layout, Book, BookOpen, TrendingUp, X, Zap, Edit, Play, Pause, Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight, Settings, Repeat, SkipBack, UserPlus, ZoomOut, ZoomIn, User, Volume } from 'react-feather';
+import {AlignCenter, Key, Layout, Book, BookOpen, TrendingUp, X, Zap, Edit, Edit2, Play, Pause, Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight, Settings, Repeat, SkipBack, UserPlus, ZoomOut, ZoomIn, User, Volume } from 'react-feather';
 
 import { Document, Page } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -212,6 +212,7 @@ export function ConsolePage() {
 
   const [pdfFilePath1, setpdfFilePath1] = useState(`./play/${magzines[0]}/${magzines[0]}.pdf`);
   const [audioFilePath1, setaudioFilePath1] = useState(`./play/${magzines[0]}/${magzines[0]}.wav`);
+  const [isAudioExisting, setIsAudioExisting] = useState(false);
   
   const [newAudioCaptions, setNewAudioCaptions] = useState([]);
   const audioCaptions = useRef(newAudioCaptions);
@@ -485,6 +486,7 @@ export function ConsolePage() {
   }
 
   // Initialize the keywords with the first magazine
+  /*
   useEffect(() => {
     const bInstructions = async () => {
       const instructions = await buildInstructions();
@@ -492,13 +494,46 @@ export function ConsolePage() {
     };
 
     bInstructions(); // Call the async function
-  }, []);     
+  }, []);     */
+
+  const setAudioExisting = async ({magzine} = {magzine: magzines[0]}) => {
+
+    const placeholder = 'hello';
+    const response: Response = await fetch(`http://localhost:3001/api/audio/check?magzine=${encodeURIComponent(magzine)}&word=${(placeholder)}`);    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const res: any = await response.json();      
+    const audioExisting = res.audioExisting;
+    if (audioExisting === 'true') {
+      setIsAudioExisting(true);  
+
+      const instructions = await buildInstructions();
+      setNewInstructions(instructions);       
+
+      const captions = await transformAudioScripts();
+      setNewAudioCaptions(captions);       
+
+      const keywords = await fetchKeywords();
+      setNewKeywords(keywords);       
+
+    } else {
+      setIsAudioExisting(false);
+    }   
+  };  
+
+  // Initialize the keywords with the first magazine
+  useEffect(() => {
+    setAudioExisting(); // Call the async function
+  }, []);   
 
   useEffect(() => {
     instructions.current = newInstructions; // Sync ref with the updated state
   }, [newInstructions]);      
 
   // Initialize the keywords with the first magazine
+  /*
   useEffect(() => {
     const fetchNewKeywords = async () => {
       const keywords = await fetchKeywords();
@@ -506,13 +541,14 @@ export function ConsolePage() {
     };
 
     fetchNewKeywords(); // Call the async function
-  }, []);   
+  }, []);   */
 
   useEffect(() => {
     Keywords.current = newKeywords; // Sync ref with the updated state
   }, [newKeywords]);    
 
   // Initialize the audio captions with the first magazine
+  /*
   useEffect(() => {
     const fetchAudioCaptions = async () => {
       const captions = await transformAudioScripts();
@@ -520,11 +556,17 @@ export function ConsolePage() {
     };
 
     fetchAudioCaptions(); // Call the async function
-  }, []); 
+  }, []); */
 
   useEffect(() => {
     audioCaptions.current = newAudioCaptions; // Sync ref with the updated state
   }, [newAudioCaptions]);  
+
+  const handleModelChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newModel = event.target.value;
+
+    await chatRef.current.updateChatModel(newModel);
+  };
 
   // Update PDF file path, audio file path and audio captions when a new magzine is selected
   const handleSelectChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -533,20 +575,45 @@ export function ConsolePage() {
     setNewMagzine(`${newMagzine.replace(/[_-]/g, " ")}`);
 
     setpdfFilePath1(`./play/${newMagzine}/${newMagzine}.pdf`);
-    setaudioFilePath1(`./play/${newMagzine}/${newMagzine}.wav`);
 
-    audioRef.current.src = `./play/${newMagzine}/${newMagzine}.wav`;
-    audioRef.current.currentTime = 0;    
-    setProgress(0);
-    setCurrentTime(0);
-    if(isPlaying){toggleAudio();}
-    setNewAudioCaptions( await transformAudioScripts({magzine: newMagzine}) );
-    setNewKeywords( await fetchKeywords({magzine: newMagzine}) );
+    // check whether the audio file exists
+    const placeholder = 'hello';
+    const response: Response = await fetch(`http://localhost:3001/api/audio/check?magzine=${encodeURIComponent(newMagzine)}&word=${(placeholder)}`);    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-    const newInstructions = await buildInstructions({magzine: newMagzine});
-    setNewInstructions( newInstructions );
-    const client = clientRef.current;
-    client.updateSession({ instructions: newInstructions });     
+    const res: any = await response.json();      
+    const audioExisting = res.audioExisting;
+    if (audioExisting === 'true') {
+      setIsAudioExisting(true);  
+
+      setaudioFilePath1(`./play/${newMagzine}/${newMagzine}.wav`);
+
+      audioRef.current.src = `./play/${newMagzine}/${newMagzine}.wav`;
+      audioRef.current.currentTime = 0;    
+      setProgress(0);
+      setCurrentTime(0);
+      if(isPlaying){toggleAudio();}
+      setNewAudioCaptions( await transformAudioScripts({magzine: newMagzine}) );
+      setNewKeywords( await fetchKeywords({magzine: newMagzine}) );
+  
+      const newInstructions = await buildInstructions({magzine: newMagzine});
+      setNewInstructions( newInstructions );
+      const client = clientRef.current;
+      client.updateSession({ instructions: newInstructions });          
+
+    } else {  
+      setIsAudioExisting(false);  
+      audioRef.current.src = '';
+      audioRef.current.currentTime = 0;    
+      setProgress(0);
+      setCurrentTime(0);      
+      const client = clientRef.current;
+      setNewKeywords( {} );
+      client.updateSession({ instructions: 'You are a helpful assistant and ready to answer any question' });         
+    }    
+ 
   };  
 
   // Some times isConnected could not reflect the actual connection status due to the delay of the state update
@@ -1201,6 +1268,7 @@ export function ConsolePage() {
 
   //tbd: why response.ok is always true even the audio file is not existing
   // Check if the server has cache issue
+  /*
   const isAudioExisting = async () => {
     try {
       const response = await fetch(`./play/${newMagzine}/${newMagzine}.wav`, {
@@ -1221,7 +1289,7 @@ export function ConsolePage() {
       console.error('Error checking resource:', error);
       return false;
     }  
-  };  
+  };  */
 
   // Load the audio file when the component mounts
   useEffect(() => {
@@ -1731,7 +1799,7 @@ export function ConsolePage() {
     if(openRightArrow){
       openRightArrow.click();
     }
-    clientRef.current.updateSession({instructions: `Provide Chinese meaning, part of speech and English phonetic transcription two usage examples in English with also their chinese translation for the given word`});              
+    clientRef.current.updateSession({instructions: `Provide Chinese meaning, part of speech and English phonetic transcription in one line with splitter slash and a new line with two usage examples in English with also their chinese translation for the given word. Only output the content and skip the words, e.g. 'Chinese meaning:', 'Part of speech:' or 'English phonetic transcription:'.`});              
     chatRef.current.chatFromExternal(`'${word}'`);
     await sleep(1500);    
     //restore the original instructions
@@ -1754,12 +1822,19 @@ export function ConsolePage() {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
+    console.log('after image request');
     const image: any = await response.json();      
     const imgURL = image.imgURL;
     const prompt = image.prompt;    
     console.log(imgURL);
     //localStorage.setItem(`tmp::${word}`, imgURL);
-    
+
+    /*
+    const imgRecraft = document.getElementById('imgRecraft');
+    if(imgRecraft){
+      (imgRecraft as HTMLImageElement).src = imgURL;
+    }*/
+   
     if(imgURL.includes(' ')){
       await chatRef.current.updateGenImage(`![Image Could not be loaded](${encodeURIComponent(imgURL)}  "${prompt}")`);
     }else{
@@ -1849,17 +1924,20 @@ export function ConsolePage() {
 
       const wordCardLi = document.getElementById('wordCardLi');  
       const readAloudLi = document.getElementById('readAloudLi');  
+      const translateLi = document.getElementById('translateLi');  
       const explainLi = document.getElementById('explainLi');
       if( selectedText.includes(' ') || selectedText.includes('\n') || selectedText.length>15 )  
       {// Not likely a single WORD selected, hide the wordCard
         wordCardLi.style.display = 'none';        
-        readAloudLi.style.display = 'none';
+        readAloudLi.style.display = 'block';
+        translateLi.style.display = 'block';
         explainLi.style.display = 'block';
       }else{
         wordCardLi.style.display = 'block';
-        readAloudLi.style.display = 'none';        
+        readAloudLi.style.display = 'none';   
+        translateLi.style.display = 'none';     
         explainLi.style.display = 'none';    
-        wordCardLi.onclick = async () => {
+        wordCardLi.onclick = async (event) => {
           try{
 
             explainAndShowImage(selectedText);
@@ -1870,12 +1948,46 @@ export function ConsolePage() {
         };
       }
       
-      /*
-      let selectionTxt = getSelectedText().trim();
+      
+      //let selectionTxt = getSelectedText().trim();
       //readAloudLi.onclick = () => selectionTTS(selectedText);
       if(readAloudLi.style.display === 'block'){
-        readAloudLi.onclick = () => {chatRef.current.chatFromExternal(`Read Aloud about '${selectedText}' and explain to me its chinese meaning  and provide to two usage examples in English.`);};
-      }*/
+        //readAloudLi.onclick = () => {chatRef.current.chatFromExternal(`Read Aloud about '${selectedText}' and explain to me its chinese meaning  and provide to two usage examples in English.`);};
+        readAloudLi.onclick = () => {
+          
+          //chatRef.current.chatFromExternal(`Read Aloud about '${selectedText}'.`);
+
+          // Read Aloud the selected text from LLM
+          const client = clientRef.current;
+          if(client.isConnected()){
+              client.sendUserMessageContent([
+              {
+                type: `input_text`,
+                text: `Read Aloud: ${selectedText} with slow speed and with clear and encourage tone. only output the read aloud content`,
+              },
+            ]);  
+          }          
+          
+        };
+      }
+
+      if(translateLi.style.display === 'block'){
+        translateLi.onclick = () => {
+          //chatRef.current.chatFromExternal(`Translate the '${selectedText}' into Chinese.`);
+        
+          // Read Aloud the selected text from LLM
+          const client = clientRef.current;
+          if(client.isConnected()){
+              client.sendUserMessageContent([
+              {
+                type: `input_text`,
+                text: `Translate: the '${selectedText}' into Chinese. only output the chinese translation`,
+              },
+            ]);  
+          }            
+
+        };
+      }      
       
       if(explainLi.style.display === 'block'){
         explainLi.onclick = () => {
@@ -2847,13 +2959,15 @@ export function ConsolePage() {
 
         }        
 
-        await showVideofromYoutube(query);
+        await showVideofromYoutube(query);        
         //return imageDescriptionRef.current;
         //return imageDescription;
 
         if(!isMuteBtnDisabled && !isMuted){
           muteBtnRef.current.click();
         }        
+
+        return { ok: true };
 
       }
     );        
@@ -3459,12 +3573,13 @@ export function ConsolePage() {
       {/* ContextMenu when text selected  */}   
       <div id="contextMenu" style={{position: 'absolute', display: 'none'}}>
         <ul>
-          <li id='wordCardLi'>Word Card</li>
-          <li id='readAloudLi'>Read Aloud</li>
-          <li id='explainLi'>Explain</li>
-          <li id='searchVideosLi'>Search Videos</li>
+          <li id='wordCardLi'>Word Card/单词卡</li>
+          <li id='readAloudLi'>Read Aloud/大声读</li>
+          <li id='translateLi'>Translate/翻译</li>
+          <li id='explainLi'>Explain/解释一下</li>
+          <li id='searchVideosLi'>Search Videos/相关视频</li>
           <li style={{display: 'none'}}>Search the web</li>
-          <li id='talkAboutSelection'>Have a talk</li>
+          <li id='talkAboutSelection'>Deep Dive/深入了解</li>
           <li>
             <form onSubmit={handleSubmit}>
               <input id='menuInput' placeholder="Ask me anything..." style={{marginRight: '5px'}}></input>
@@ -3573,7 +3688,7 @@ export function ConsolePage() {
           <div className='magzine-title' style={{height: '25px', justifyContent: 'center', marginLeft: 'auto', marginRight: 'auto', userSelect: 'none'}}><img id='imgRecraft' src='./resource/ngl.png' width="70px" height="20px" style={{marginRight: "5px"}}></img>{newMagzine}
           </div>                    
           <Button
-            style={{height: '10px', display: 'flex'}}
+            style={{height: '10px', display: 'none'}}
             label={'WebRTC Test'}
             onClick={test_zhipu_realtime1}
             //onClick={test_webrtc}
@@ -3756,7 +3871,7 @@ export function ConsolePage() {
         {/* Open(Left Arrow<-) or Close((Right Arrow->)) Right Panel */}
         <div className="button-container">
           <div id="openRightArrow" className="close-icon-right" onClick={openChatbot} style={{display: (isConnected? "flex": "flex")}}><ArrowLeft style={{ width: '18px', height: '18px' }} /></div>
-          <div className="tooltip1"><span>Open Chatbot</span></div>
+          <div className="tooltip1"><span>Open Sidebar</span></div>
         </div>
         <div  id="closeRightArrow" className="close-icon-left" onClick={closeRightArrowNew} style={{display: "none"}}><ArrowRight style={{ width: '18px', height: '18px' }} /></div>
         {/* tooltip for the left button still does not work */}
@@ -3897,6 +4012,7 @@ export function ConsolePage() {
                   iconPosition={'start'}
                   icon={AlignCenter}                  
                   onClick={toggleCaptionVisibility}
+                  disabled={!isAudioExisting}
                   className='button'
           />                      
         </div>
@@ -3911,7 +4027,8 @@ export function ConsolePage() {
                   icon={isPlaying ? Pause : Play}
                   buttonStyle={'regular'}
                   onClick={toggleAudio}
-                  disabled={isAudioExisting() ? false : true}
+                  //disabled={isAudioExisting() ? false : true}
+                  disabled={!isAudioExisting}
                   className='button'
           />
           <div className="tooltip"  style={{display: isCaptionVisible? 'none' : 'flex'}}>
@@ -3923,7 +4040,7 @@ export function ConsolePage() {
         <div 
           ref={progressBarRef}
           style={{position: 'relative', width: '60%', backgroundColor: '#ccc', height: '0.625em', borderRadius: '0.3125em', marginTop: '0.2em', marginLeft: '-1px', userSelect: 'none' }}
-          onMouseDown={handleMouseDown}>
+          onMouseDown={isAudioExisting ? handleMouseDown : undefined}>
           <div style={{ 
                         width: `${progress}%`,
                         backgroundColor: '#007bff',
@@ -4130,14 +4247,28 @@ export function ConsolePage() {
                 <div>{localStorage.getItem('tmp::voice_api_key').slice(0, 3)}...</div>                
               </div> 
               <div className="speed-controls">
-                <div title='Select a new issue'><Book style={{ width: '13px', height: '13px' }} onClick={() => resetAPIKey()} />:</div>
+                <div title='Chat Models'><Edit2 style={{ width: '13px', height: '13px' }} />:</div>
+                <select id="Model" name="Model" onChange={handleModelChange} style={{height: '20px', width:'90%'}}>            
+                  <option key={1} value={'GPT-Realtime'}>
+                      {'GPT-Realtime'}
+                  </option>                  
+                  <option key={2} value={'GPT-4o'}>
+                      {'GPT-4o'}
+                  </option>
+                  <option key={3} value={'DeepSpeek'}>
+                      {'DeepSeek'}
+                  </option>                  
+                </select>                          
+              </div>               
+              <div className="speed-controls">
+                <div title='Select a new issue'><Book style={{ width: '13px', height: '13px' }} />:</div>
                 <select id="Magzine" name="Magzine" onChange={handleSelectChange} style={{height: '20px', width:'90%'}}>            
-                {magzines.map((magazine, index) => (
-                        <option key={index} value={magazine}>
-                            {magazine}
-                        </option>
-                    ))}
-              </select>                            
+                  {magzines.map((magazine, index) => (
+                          <option key={index} value={magazine}>
+                              {magazine}
+                          </option>
+                      ))}
+                </select>                            
               </div>                                                                                             
             </div>                         
           </div>   

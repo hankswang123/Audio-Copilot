@@ -84,7 +84,7 @@ const UserMessage = ({ text }: { text: string }) => {
 
   const preprocessText = (text: string) => {
 
-    if (text.includes('Read Aloud:') ) {
+    if (text.includes('Read Aloud:') || text.includes('Translate:') ) {
       //return 'Describe Selection';
       return '';
     }  
@@ -314,6 +314,8 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
   //const [items, setItems] = useState<ItemType[]>([]);
   //const [items, setItems] = useState<ZPItemType[]>([]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  //const [chatModel, setChatModel] = useState("DeepSeek");
+  const [chatModel, setChatModel] = useState("GPT-Realtime");
   const [isChecked, setIsChecked] = useState(true);
 
   /* Load message from local storage or IDB
@@ -406,6 +408,9 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
 
   // Use useImperativeHandle to define functions that the parent can call
   useImperativeHandle(ref, () => ({
+    updateChatModel(chatModel) {
+      setChatModel(chatModel);
+    }, 
     updateData(audioData) {
       appendMessage("user", audioData);
     },
@@ -587,7 +592,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
     submitActionResult(runId, toolCallOutputs);
   };  
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim()) {
       const muteButton = document.getElementById('muteButton');
@@ -597,6 +602,46 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
       return;
     }
 
+    switch (chatModel) {
+      case "GPT-Realtime":
+        if(realtimeClient.isConnected()){
+          realtimeClient.sendUserMessageContent([
+            {
+              type: `input_text`,
+              text: userInput,
+            },
+          ]);
+        }else{
+          appendMessage("assistant", "RealTime API Connection error. Please Connect again...");
+          setInputDisabled(false);
+        }
+        break;
+
+      case "GPT-4o":
+        setMessages((prev) => [...prev, { role: "user", text: userInput }]);
+        sendMessage(userInput);
+        setInputDisabled(true);
+        break;
+
+      case "DeepSeek":
+        setMessages((prev) => [...prev, { role: "user", text: userInput }]);
+        setUserInput("");
+        console.log('DeepSpeek model');
+        const query = userInput;
+        const response: Response = await fetch(`http://localhost:3001/api/deepseek/chat?q=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }        
+
+        const resp: any = await response.json();
+        appendMessage("assistant", resp);
+        break;
+
+      default:
+        return null;
+    }      
+
+    /*
     const checkBox = document.getElementById('checkBox') as HTMLInputElement;
     //if(isChecked) {
     if(checkBox.checked) {
@@ -619,7 +664,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
       sendMessage(userInput);
       //setUserInput("");
       setInputDisabled(true);
-    }
+    }*/
     setUserInput("");
   };
 
@@ -773,7 +818,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
           //onChange={(e) => setUserInput(e.target.value)}
           onChange={handleInputOnChange}
           placeholder={realtimeClient.isConnected()? "Ask me anything..." : "Connect to ask anything!"}
-          disabled={realtimeClient.isConnected() ? false : true}
+          //disabled={realtimeClient.isConnected() ? false : true}
           style={{marginRight: '1px', border: 'none', outline: 'none'}}
         />  
         <Button
@@ -796,7 +841,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
               iconPosition={'end'}
               icon= { Send }
               //disabled={isMuteBtnDisabled}
-              disabled={realtimeClient.isConnected() ? inputDisabled : true}
+              //disabled={realtimeClient.isConnected() ? inputDisabled : true}
               buttonStyle={'regular'}
               onFocus={() => {console.log('Mute/Unmute icon should not be displayed'); }}
               style={{backgroundColor: 'transparent', fontSize: 'medium', marginLeft: '1px', marginRight: '0px', display: userInput.trim() === '' ? 'none' :'flex'}}

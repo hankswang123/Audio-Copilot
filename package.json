@@ -46,10 +46,13 @@
   },
   "scripts": {
     "prestart": "node generateFilePaths.js",
+    "start_": "concurrently \"react-app-rewired start\" \"nodemon server.js\"",
     "start": "concurrently \"react-scripts start\" \"nodemon server.js\"",
     "previous_start_scripts_": "concurrently \"nodemon ./relay-server/index.js\" \"react-scripts start\" \"nodemon server.js\" \"cd ../openai-assistants-quickstart && npm run dev\"",
     "prebuild": "node generateFilePaths.js",
+    "build_": "react-app-rewired build",
     "build": "react-scripts build",
+    "test_": "react-app-rewired test",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "zip": "zip -r realtime-api-console.zip . -x 'node_modules' 'node_modules/*' 'node_modules/**' '.git' '.git/*' '.git/**' '.DS_Store' '*/.DS_Store' 'package-lock.json' '*.zip' '*.tar.gz' '*.tar' '.env'",
@@ -81,6 +84,8 @@
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@types/nodemailer": "^6.4.16",
     "concurrently": "^9.1.0",
-    "nodemon": "^3.1.7"
+    "customize-cra": "^1.0.0",
+    "nodemon": "^3.1.7",
+    "react-app-rewired": "^2.2.1"
   }
 }
