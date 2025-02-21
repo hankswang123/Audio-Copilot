@@ -9,6 +9,8 @@
     height: 100%;
     width: 100%;
 
+    background-color:rgb(197, 243, 197);
+
     /*Enhanced*/
     font-family: 'Roboto Mono', monospace;
     font-size: 1.2em; /* Changed from 12px to 1em */
@@ -17,6 +19,30 @@
     font-style: normal;    
   }
 
+audio{
+    width: 100px;
+    height: 30px;
+}
+
+audio::-webkit-media-controls-panel {
+    background: transparent;
+    width: 0px; /* Make it small */
+}
+
+audio::-webkit-media-controls-play-button {
+
+    position: relative;
+    z-index: 10;
+}
+
+audio::-webkit-media-controls-volume-slider,
+audio::-webkit-media-controls-timeline,
+audio::-webkit-media-controls-current-time-display,
+audio::-webkit-media-controls-time-remaining-display,
+audio::-webkit-media-controls-seek-back-button,
+audio::-webkit-media-controls-seek-forward-button {
+    display: none;
+}  
 
 .inputForm {    
   /*Enhanced CSS to make sure inputForm fixed during message scrollbar scrolling*/
@@ -25,6 +51,7 @@
   right: 0;
   box-sizing: border-box;
   justify-content: flex-end;
+  background-color: white;
   /*opacity: 0.8;*/
   opacity: 1;
   /*box-shadow: 0 -0.125em 0.3125em rgba(0, 0, 0, 0.543);*/
@@ -166,66 +193,4 @@ tbd: not work as expected!!!
 .codeMessage span {
   color: #b8b8b8;
   margin-right: 8px;
-}
-
-.cv-item {
-  position: relative;
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-  &:not(:hover) .close {
-    display: none;
-  }
-  &.user {
-    align-self: flex-end;
-  }  
-  .close {
-    position: absolute;
-    top: 0px;
-    right: -20px;
-    background: #aaa;
-    color: #fff;
-    display: flex;
-    border-radius: 16px;
-    padding: 2px;
-    cursor: pointer;
-    &:hover {
-      background: #696969;
-    }
-    svg {
-      stroke-width: 3;
-      width: 12px;
-      height: 12px;
-    }
-  }
-  .speaker {
-    position: relative;
-    text-align: left;
-    gap: 16px;
-    width: 80px;
-    flex-shrink: 0;
-    margin-right: 16px;
-    &.user {
-      color: #0099ff;
-    }
-    &.assistant {
-      color: #009900;
-    }
-  }
-  .speaker-content {
-    /*color: #18181b;*/
-    margin: 8px 0;
-    padding: 8px 16px;
-    display: flex;
-    overflow: hidden;
-    word-wrap: break-word;
-    &.user {
-      align-self: flex-end;
-      color: #fff;
-      background-color: #000;
-    }
-    &.assistant {
-      color: #009900;
-    }    
-  }
 }

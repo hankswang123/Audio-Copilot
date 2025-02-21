@@ -143,7 +143,7 @@ const StructPrompt = ({ prompt }: { prompt: string }) => {
             {sentence.trim()+'.'}
           </li>
         ))}
-      </ul> );
+      </ul>);
 };
 
 const AssistantMessage = ({ text }: { text: string }) => {
@@ -436,8 +436,6 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
     },        
 
     updateItems(newItems) {
-      //setItems(items); 
-      //setItems((prevItems) => [...prevItems, ...items]);
 
       setItems((prevItems) => {
         // Create a Set of IDs for quick lookup of existing items
@@ -641,30 +639,6 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
         return null;
     }      
 
-    /*
-    const checkBox = document.getElementById('checkBox') as HTMLInputElement;
-    //if(isChecked) {
-    if(checkBox.checked) {
-    // use Realtime API to reply user input/question
-      //setMessages((prev) => [...prev, { role: "user", text: userInput }]);
-      if(realtimeClient.isConnected()){
-        realtimeClient.sendUserMessageContent([
-          {
-            type: `input_text`,
-            text: userInput,
-          },
-        ]);
-      }else{
-        appendMessage("assistant", "RealTime API Connection error. Please Connect again...");
-        setInputDisabled(false);
-      }
-    }else{
-    // use Assistant API to reply user input/question
-      setMessages((prev) => [...prev, { role: "user", text: userInput }]);
-      sendMessage(userInput);
-      //setUserInput("");
-      setInputDisabled(true);
-    }*/
     setUserInput("");
   };
 
@@ -806,19 +780,16 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
       <form
         id="inputForm"
         onSubmit={handleSubmit}
-        //className={`${styles.inputForm} ${styles.clearfix}`}
         className={`${styles.inputForm} ${!realtimeClient.isConnected() ? 'no-connection' : ''}`}
-        style={{border: '2px solid #ccc',marginLeft: '1px', marginRight: "1px"}}        
+        style={{border: '2px solid #ccc',marginLeft: '0px', marginRight: "1px"}}        
       >    
         <input
           id="chatInputBox"
           type="text"
           className={styles.input}
           value={userInput}
-          //onChange={(e) => setUserInput(e.target.value)}
           onChange={handleInputOnChange}
           placeholder={realtimeClient.isConnected()? "Ask me anything..." : "Connect to ask anything!"}
-          //disabled={realtimeClient.isConnected() ? false : true}
           style={{marginRight: '1px', border: 'none', outline: 'none'}}
         />  
         <Button
@@ -829,8 +800,7 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
           label={''}
           iconPosition={'end'}
           icon={ getIsMuted() ? MicOff : Mic}          
-          style={{backgroundColor: 'transparent', fontSize: 'medium', marginLeft: '1px', marginRight: '1px', display: userInput.trim() === '' ? 'flex' :'none' }}
-          //style={{backgroundColor: 'transparent', fontSize: 'medium', marginLeft: '1px', marginRight: '1px', display: 'none' }}
+          style={{fontSize: 'medium', marginLeft: '1px', marginRight: '1px', display: userInput.trim() === '' ? 'flex' :'none' }}
         />                        
         <Button
               title={realtimeClient.isConnected() ? "" : "Connect to chat"}
@@ -840,13 +810,9 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
               label={''}
               iconPosition={'end'}
               icon= { Send }
-              //disabled={isMuteBtnDisabled}
-              //disabled={realtimeClient.isConnected() ? inputDisabled : true}
               buttonStyle={'regular'}
               onFocus={() => {console.log('Mute/Unmute icon should not be displayed'); }}
-              style={{backgroundColor: 'transparent', fontSize: 'medium', marginLeft: '1px', marginRight: '0px', display: userInput.trim() === '' ? 'none' :'flex'}}
-              //style={{backgroundColor: 'transparent', fontSize: 'medium', marginLeft: '1px', marginRight: '0px', display: 'flex'}}
-              //onClick={toggleMuteRecording}
+              style={{fontSize: 'medium', marginLeft: '1px', marginRight: '0px', display: userInput.trim() === '' ? 'none' :'flex'}}
             /> 
         <input
           id='checkBox'

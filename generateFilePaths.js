@@ -50,3 +50,39 @@ export const audioFilePath = '${audioFile ? `./currentPlay/${audioFile}` : ''}';
 
 fs.writeFileSync(filePath, fileContent, 'utf8');
 console.log('File paths generated successfully.');
+
+
+async function moveFiles(sourceDir, destinationDir) {
+  try {
+    // Ensure the destination directory exists
+    //await fs.mkdir(destinationDir, { recursive: true });
+
+    // Read all files and subdirectories in the source directory
+
+    const fspro = fs.promises;
+    const files = await fspro.readdir(sourceDir);
+
+    for (let file of files) {
+      const sourcePath = path.join(sourceDir, file);
+      const destinationPath = path.join(destinationDir, file);
+
+      // Get file status information to determine if it is a file
+      const stats = await fspro.stat(sourcePath);
+      if (stats.isFile()) {
+        // Move the file
+        await fspro.rename(sourcePath, destinationPath);
+        console.log(`Moved: ${sourcePath} to ${destinationPath}`);
+      } else {
+        console.log(`Skipping directory: ${sourcePath}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error moving files:', error);
+  }
+}
+
+// Use the function
+const sourceDirectory = './src/wordCard'; // Source directory path
+const destinationDirectory = './public/wordCard'; // Destination directory path
+
+moveFiles(sourceDirectory, destinationDirectory);

@@ -174,10 +174,20 @@ app.get("/api/audio/check", async (req, res) => {
         // dirPath = path.join(__dirname, `public/wordCard/${magzine}`);
         const dirPath = path.join(__dirname, `public/play/${magzine}`);
         const audioPath = path.join(dirPath, `${magzine}.wav`);
+        const scriptPath = path.join(dirPath, 'audio_scripts.txt');
+        const keywordsPath = path.join(dirPath, 'keywords.txt');
 
         // Check if the audio file already exists
-        if (fs.existsSync(audioPath)) {
-            res.json({audioExisting: 'true'});
+        if (fs.existsSync(audioPath)&&fs.existsSync(scriptPath)&&fs.existsSync(keywordsPath)) {
+            res.json({audioExisting: 'true', scriptExisting: 'true', keywordsExisting: 'true'});
+        } else if(fs.existsSync(audioPath)&&fs.existsSync(scriptPath)){
+            res.json({audioExisting: 'true', scriptExisting: 'true', keywordsExisting: 'false'});
+        }
+        else if(fs.existsSync(audioPath)&&fs.existsSync(keywordsPath)){ 
+            res.json({audioExisting: 'true', scriptExisting: 'false', keywordsExisting: 'true'});   
+        }
+        else if(fs.existsSync(audioPath)){ 
+            res.json({audioExisting: 'true', scriptExisting: 'false', keywordsExisting: 'false'});                        
         } else{res.json({audioExisting: 'false'});}
 
     } catch(error) {
@@ -189,6 +199,58 @@ app.get("/api/audio/check", async (req, res) => {
     }     
 });
 
+let imgURLCache = [];
+const hasKey = (key) => imgURLCache.some(obj => obj.hasOwnProperty(key));
+const getValueByKey = (key) => {
+  const obj = imgURLCache.find(obj => obj.hasOwnProperty(key));
+  return obj ? obj[key] : undefined;
+};
+const addKeyValuePair = (key, value) => {
+  const newObj = {};
+  newObj[key] = value;
+  imgURLCache.push(newObj);
+};
+
+// Call recraft.ai API to generate image based on the provided prompt
+app.get("/api/recraft/image_prompt", async (req, res) => {
+    const { magzine, word } = req.query;
+
+    try {
+
+        // 3. Image is not existing neither in public/wordCard nor in src/wordCard
+        // Generate the image using recraft.ai API and return the real image URL in recraft.ai
+        const finalPrompt = word; 
+
+        const apikey = process.env.RECRAFT_API_KEY;
+        if (!apikey) {
+            throw new Error("recraft API key is not set");
+        }         
+
+        const recraft = new OpenAI({
+            baseURL: process.env.RECRAFT_BASE_URL,
+            apiKey: apikey,
+        });               
+
+        const imgRes = await recraft.images.generate({
+            model: 'recraft20b',
+            prompt: finalPrompt,
+            style: 'digital_illustration',
+            extra_body: {'substyle': 'hand_drawn'},
+        }); 
+
+        const imgUrl = imgRes.data[0].url;
+        console.log('Image URL from recraft: ', imgUrl);
+
+        res.json({imgURL: imgUrl, prompt: `${finalPrompt}`});
+
+    } catch(error) {
+        console.error('Error generating image:', error);
+        res.status(500).json({ 
+            error: 'Failed to generate Image from recraft.ai', 
+            details: error.message 
+        });
+    }     
+});
 
 // Call recraft.ai API to generate image based on the word
 app.get("/api/recraft/image", async (req, res) => {
@@ -200,25 +262,53 @@ app.get("/api/recraft/image", async (req, res) => {
         const imgPath = path.join(dirPath, `${word}.png`);        
         const promptPath = path.join(dirPath, `${word}.txt`);
 
+        const dirPath1 = path.join(__dirname, `src/wordCard`);
+        const imgPath1 = path.join(dirPath1, `${word}.png`);        
+        const promptPath1 = path.join(dirPath1, `${word}.txt`);                
+
         // Ensure the directory exists
         if (!fs.existsSync(dirPath)) {
             fs.mkdirSync(dirPath, { recursive: true });
         }
 
         //const prompt = await promptGen(word); 
-        // Check if the file already exists
+        // 1. Check if the Image already downloaded in public/wordCard folder
         if (fs.existsSync(imgPath)) {
             if(fs.existsSync(promptPath)){
                 const savedPrompt = await fs.promises.readFile(promptPath, 'utf-8');
                 res.json({imgURL: `/wordCard/${word}.png`, prompt: `${savedPrompt}`});
             }else{
                 const addPrompt = await promptGen(word); 
-                await fs.promises.writeFile(promptPath, addPrompt);
+                await fs.promises.writeFile(promptPath1, addPrompt);
                 res.json({imgURL: `/wordCard/${word}.png`, prompt: `${addPrompt}`});
             }            
             return;
         }
 
+        // 2. Check if the Image already downloaded in src/wordCard folder
+        // src/wordCard is the temp working folder for image generation
+        // The images will be moved to public/wordCard folder when next 'npm start'
+        if (fs.existsSync(imgPath1)) {
+            if(fs.existsSync(promptPath1)){
+                const savedPrompt = await fs.promises.readFile(promptPath1, 'utf-8');
+                //read image URL from cache
+                const imgURL1 = getValueByKey(word);
+                if(imgURL1){
+                    res.json({imgURL: imgURL1, prompt: `${savedPrompt}`});
+                }
+            }else{
+                const addPrompt = await promptGen(word); 
+                await fs.promises.writeFile(promptPath1, addPrompt);
+                const imgURL1 = getValueByKey(word);
+                if(imgURL1){
+                    res.json({imgURL: imgURL1, prompt: `${addPrompt}`});
+                }
+            }            
+            return;
+        }        
+
+        // 3. Image is not existing neither in public/wordCard nor in src/wordCard
+        // Generate the image using recraft.ai API and return the real image URL in recraft.ai
         const prompt = await promptGen(word); 
         //const prompt = await promptGen_ds(word); 
         console.log('generted prompt by openAI:', prompt);
@@ -244,10 +334,18 @@ app.get("/api/recraft/image", async (req, res) => {
         }); 
 
         const imgUrl = imgRes.data[0].url;
+        console.log('Image URL from recraft: ', imgUrl);
+        //write image URL to cache
+        addKeyValuePair(word, imgUrl);
+
+        // Download the image and save it to src/wordCard folder to avoid Refresh issue!!!
         const imgResponse = await axios.get(imgUrl, { responseType: 'arraybuffer' });
-        await fs.promises.writeFile(imgPath, imgResponse.data);
-        await fs.promises.writeFile(promptPath, finalPrompt);
-        res.json({imgURL: `/wordCard/${word}.png`, prompt: `${finalPrompt}`});
+        await fs.promises.writeFile(imgPath1, imgResponse.data);
+        console.log('Image downloaded to: ', imgPath1);
+        await fs.promises.writeFile(promptPath1, finalPrompt);
+        console.log('Prompt saved to: ', promptPath1);
+
+        res.json({imgURL: imgUrl, prompt: `${finalPrompt}`});
 
         // 使用 Promise 处理图片下载
         /*

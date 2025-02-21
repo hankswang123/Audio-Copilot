@@ -70,6 +70,18 @@ export class WavStreamPlayer {
     return true;
   }
 
+  setMute() {
+    if(this.gainNode) {
+      this.gainNode.gain.value = -1;
+    }
+  }
+
+  unMute() {
+    if(this.gainNode) {
+      this.gainNode.gain.value = 0;
+    }
+  }
+
   /**
    * Gets the current frequency domain data from the playing track
    * @param {"frequency"|"music"|"voice"} [analysisType]

@@ -34,8 +34,9 @@ import { Document, Page } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 import './ConsolePage.scss';
-import { magzines, fetchKeywords, transformAudioScripts, buildInstructions, tts_voice } from '../utils/app_util.js';
+import { magzines, fetchKeywords, transformAudioScripts, buildInstructions, genKeywords, tts_voice } from '../utils/app_util.js';
 import Chat, {openai} from '../components/chat/Chat';
+import CountdownTimer from '../components/countdowntimer/CountdownTimer';
 import PdfViewerWithIcons from '../components/pdf/PdfViewerWithIcons';
 import { Button } from '../components/button/Button';
 import SessionControls from "../components/webrtc/SessionControls";
@@ -213,6 +214,7 @@ export function ConsolePage() {
   const [pdfFilePath1, setpdfFilePath1] = useState(`./play/${magzines[0]}/${magzines[0]}.pdf`);
   const [audioFilePath1, setaudioFilePath1] = useState(`./play/${magzines[0]}/${magzines[0]}.wav`);
   const [isAudioExisting, setIsAudioExisting] = useState(false);
+  const [isScriptExisting, setIsScriptExisting] = useState(false);
   
   const [newAudioCaptions, setNewAudioCaptions] = useState([]);
   const audioCaptions = useRef(newAudioCaptions);
@@ -419,7 +421,10 @@ export function ConsolePage() {
                   client.sendUserMessageContent([
                   {
                     type: `input_text`,
-                    text: `Read Aloud: ${response}`,
+                    text: `Read Aloud: ${response}. 
+                    The output should follow the format:
+                    Screenshot Description:                      
+                    - {Each sentence of the response}`,
                   },
                 ]);  
               }
@@ -506,20 +511,45 @@ export function ConsolePage() {
 
     const res: any = await response.json();      
     const audioExisting = res.audioExisting;
+    const basicInstructions = await buildInstructions({magzine: 'no_scripts'});
     if (audioExisting === 'true') {
       setIsAudioExisting(true);  
 
-      const instructions = await buildInstructions();
-      setNewInstructions(instructions);       
+      if( res.scriptExisting === 'true' )
+      {
+        setIsScriptExisting(true);
 
-      const captions = await transformAudioScripts();
-      setNewAudioCaptions(captions);       
+        const instructions = await buildInstructions();
+        setNewInstructions(instructions);   
 
-      const keywords = await fetchKeywords();
-      setNewKeywords(keywords);       
+        const captions = await transformAudioScripts();
+        setNewAudioCaptions(captions); 
+
+        const keywords = await genKeywords();
+        setNewKeywords(keywords);
+      } else {
+        setIsScriptExisting(false);
+        setNewInstructions(basicInstructions);   
+        if(isCaptionVisible){
+          setIsCaptionVisible(false);
+        }
+
+        setNewAudioCaptions([]);
+      }
+
+      /*
+      if( res.keywordsExisting === 'true' )
+      {
+        const keywords = await fetchKeywords();
+        setNewKeywords(keywords);       
+      }     */
 
     } else {
       setIsAudioExisting(false);
+      setIsScriptExisting(false);
+      setNewInstructions(basicInstructions);   
+
+      setNewAudioCaptions([]);
     }   
   };  
 
@@ -530,6 +560,12 @@ export function ConsolePage() {
 
   useEffect(() => {
     instructions.current = newInstructions; // Sync ref with the updated state
+
+    if(newInstructions !== ''){
+      const client = clientRef.current;
+      client.updateSession({ instructions: newInstructions });
+    }
+
   }, [newInstructions]);      
 
   // Initialize the keywords with the first magazine
@@ -570,6 +606,7 @@ export function ConsolePage() {
 
   // Update PDF file path, audio file path and audio captions when a new magzine is selected
   const handleSelectChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const client = clientRef.current;
     const newMagzine = event.target.value;
 
     setNewMagzine(`${newMagzine.replace(/[_-]/g, " ")}`);
@@ -585,6 +622,7 @@ export function ConsolePage() {
 
     const res: any = await response.json();      
     const audioExisting = res.audioExisting;
+    const basicInstructions = await buildInstructions({magzine: 'no_scripts'});
     if (audioExisting === 'true') {
       setIsAudioExisting(true);  
 
@@ -595,25 +633,52 @@ export function ConsolePage() {
       setProgress(0);
       setCurrentTime(0);
       if(isPlaying){toggleAudio();}
-      setNewAudioCaptions( await transformAudioScripts({magzine: newMagzine}) );
-      setNewKeywords( await fetchKeywords({magzine: newMagzine}) );
-  
-      const newInstructions = await buildInstructions({magzine: newMagzine});
-      setNewInstructions( newInstructions );
-      const client = clientRef.current;
-      client.updateSession({ instructions: newInstructions });          
+
+      if( res.scriptExisting === 'true' )
+      {      
+        setIsScriptExisting(true);
+
+        setNewAudioCaptions( await transformAudioScripts({magzine: newMagzine}) );
+    
+        const newInstructions = await buildInstructions({magzine: newMagzine});
+        setNewInstructions( newInstructions );
+
+        client.updateSession({ instructions: newInstructions });      
+      }else{
+        setIsScriptExisting(false);        
+        setNewInstructions( basicInstructions );
+        if(isCaptionVisible){
+          setIsCaptionVisible(false);
+        }
+        //client.updateSession({ instructions: 'You are a helpful assistant and ready to answer any question' }); 
+        client.updateSession({ instructions: basicInstructions });      
+
+        setNewAudioCaptions( [] );
+      }    
+
+      if( res.keywordsExisting === 'true' )
+      {
+        setNewKeywords( await fetchKeywords({magzine: newMagzine}) );      
+      }else{
+        const keywords = await genKeywords({magzine: newMagzine});
+        setNewKeywords(keywords);        
+        //setNewKeywords( {} );
+      }
 
     } else {  
       setIsAudioExisting(false);  
       audioRef.current.src = '';
       audioRef.current.currentTime = 0;    
       setProgress(0);
-      setCurrentTime(0);      
-      const client = clientRef.current;
+      setCurrentTime(0);            
+
+      //client.updateSession({ instructions: 'You are a helpful assistant and ready to answer any question' });         
+      setIsScriptExisting(false);
+      setNewInstructions( basicInstructions );
+      client.updateSession({ instructions: basicInstructions });      
+
       setNewKeywords( {} );
-      client.updateSession({ instructions: 'You are a helpful assistant and ready to answer any question' });         
     }    
- 
   };  
 
   // Some times isConnected could not reflect the actual connection status due to the delay of the state update
@@ -622,7 +687,27 @@ export function ConsolePage() {
   // Update the ref whenever `isConnected` changes
   useEffect(() => {
     isConnectedRef.current = isConnected;
+
+    //const client = clientRef.current;
+    //if(!client.isConnected()){
+    if(!isConnected){
+      connnectRealtimeAPI();
+    }
+
   }, [isConnected]);
+
+  useEffect(() => {
+    const startCountDown = document.getElementById('countDownStartBtn');
+    const resetCountDown = document.getElementById('countDownResetBtn');
+
+    if(startCountDown && isConnectedRef.current){
+      startCountDown.click();
+    }
+
+    if(resetCountDown && !isConnectedRef.current){
+      resetCountDown.click();
+    }
+  }, [isConnected]);  
 
   interface FormatTimeProps {
     time: number;
@@ -1778,19 +1863,44 @@ export function ConsolePage() {
     
   };
 
-  /*
-  let imgURLCache = [];
-  const hasKey = (key) => imgURLCache.some(obj => obj.hasOwnProperty(key));
-  const getValueByKey = (key) => {
-    const obj = imgURLCache.find(obj => obj.hasOwnProperty(key));
-    return obj ? obj[key] : undefined;
-  };
-  const addKeyValuePair = (key, value) => {
-    const newObj = {};
-    newObj[key] = value;
-    imgURLCache.push(newObj);
-  };*/
+  const askDeepSeekByPrompt = async (prompt) => {
 
+    try{
+      const query = prompt;
+      const response: Response = await fetch(`http://localhost:3001/api/deepseek/chat?q=${encodeURIComponent(query)}`);
+      if (!response.ok) {
+        return null;
+      }        
+  
+      const resp: any = await response.json();    
+      console.log(resp);
+
+      return resp;
+    }
+    catch(error){
+      console.log("there is error during chat in Function Call: Ask DeepSeek");
+    }    
+  }    
+
+  const createImageByPrompt = async (prompt) => {
+
+    //Generate image by recraft.ai for the given word at the first time
+    const response: Response = await fetch(`http://localhost:3001/api/recraft/image_prompt?magzine=${encodeURIComponent(newMagzine)}&word=${(prompt)}`);    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    console.log('after image request');
+    const image: any = await response.json();      
+    const imgURL = image.imgURL;
+    const propt = image.prompt;    
+    console.log(imgURL);
+
+    await chatRef.current.updateGenImage(`![Image Could not be loaded](${imgURL} "${propt}")`); 
+    
+  }  
+
+  //const imagesContext = (require as any).context('../wordCard', false, /\.png$/);
   // Explain the selected word and generate an image by recraft.ai
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const explainAndShowImage = async (word) => {
@@ -1799,7 +1909,50 @@ export function ConsolePage() {
     if(openRightArrow){
       openRightArrow.click();
     }
-    clientRef.current.updateSession({instructions: `Provide Chinese meaning, part of speech and English phonetic transcription in one line with splitter slash and a new line with two usage examples in English with also their chinese translation for the given word. Only output the content and skip the words, e.g. 'Chinese meaning:', 'Part of speech:' or 'English phonetic transcription:'.`});              
+    /* Previous Instruction
+    clientRef.current.updateSession({instructions: `
+      Provide Chinese meaning, part of speech and English phonetic transcription in one line with splitter slash and a new line with two usage examples in English with also their chinese translation for the given word. The two English usage examples should prefer to use the simple words in the sentence. Only output the content and skip the words, e.g. 'Chinese meaning:', 'Part of speech:' or 'English phonetic transcription:'.
+      The output should follow the format:
+      {word}: {chinese meaning1};{chinese meaning1} / {part of speech} / {english phonetic transcription}<br />
+      Usage Examples:
+       - {usage example1 in English} ({chinese translation1})
+       - {usage example2 in English} ({chinese translation1})
+      `});     */
+    clientRef.current.updateSession({instructions: `
+      # Personality and Tone
+      ## Identity
+      You are a friendly and playful teacher who loves explaining words to young children (ages 5-7). You make learning fun by using simple words, short sentences, and lots of relatable examples. You enjoy telling mini-stories, using silly comparisons, and making kids smile while they learn.  
+
+      ## Demeanor
+      Cheerful, warm, and engaging—like a fun teacher or a friendly cartoon character who is always excited to help.  
+
+      ## Tone
+      Lighthearted, playful, and encouraging. Every response should feel friendly and full of curiosity.  
+
+      ## Level of Enthusiasm
+      High! You should sound excited about teaching and make learning feel like an adventure.  
+
+      ## Level of Formality  
+      Casual and child-friendly, like a fun conversation rather than a lesson.  
+
+      ## Level of Emotion  
+      Very expressive! Use excitement, surprise, and warmth in your responses.  
+
+      ## Filler Words  
+      Occasionally use playful expressions like “Ooooh!” “Wow!” “Hmm, let’s think!” to make it sound natural.  
+
+      ## Pacing  
+      Moderate, with pauses where needed to make sure the child has time to think and respond.        
+
+      ## Task
+      Your job is to show word card in a way that is easy and fun for a young child to understand.       
+      Provide Chinese meaning, part of speech and English phonetic transcription in one line with splitter slash and a new line with two usage examples in English with also their chinese translation for the given word. The two English usage examples should prefer to use the simple words in the sentence. Only output the content and skip the words, e.g. 'Chinese meaning:', 'Part of speech:' or 'English phonetic transcription:'.
+      The output should follow the format:
+      {word}: {chinese meaning1};{chinese meaning1} / {part of speech} / {english phonetic transcription}<br />
+      Usage Examples:
+       - {usage example1 in English} ({chinese translation1})
+       - {usage example2 in English} ({chinese translation1})
+      `});                    
     chatRef.current.chatFromExternal(`'${word}'`);
     await sleep(1500);    
     //restore the original instructions
@@ -1828,12 +1981,6 @@ export function ConsolePage() {
     const prompt = image.prompt;    
     console.log(imgURL);
     //localStorage.setItem(`tmp::${word}`, imgURL);
-
-    /*
-    const imgRecraft = document.getElementById('imgRecraft');
-    if(imgRecraft){
-      (imgRecraft as HTMLImageElement).src = imgURL;
-    }*/
    
     if(imgURL.includes(' ')){
       await chatRef.current.updateGenImage(`![Image Could not be loaded](${encodeURIComponent(imgURL)}  "${prompt}")`);
@@ -1841,7 +1988,8 @@ export function ConsolePage() {
       //with request with timestamp parameter will lead to frontpage refresh after image generated is saved in backend
       //await chatRef.current.updateImage(`![Image Could not be loaded](${imgURL}?t=${Date.now()})`);
       //await chatRef.current.updateGenImage(`![Image Could not be loaded](${imgURL})`);
-      await chatRef.current.updateGenImage(`![Image Could not be loaded](${encodeURIComponent(imgURL)} "${prompt}")`);
+      //await chatRef.current.updateGenImage(`![Image Could not be loaded](${encodeURIComponent(imgURL)} "${prompt}")`);
+      await chatRef.current.updateGenImage(`![Image Could not be loaded](${imgURL} "${prompt}")`);
     }   
     
   }
@@ -1931,10 +2079,11 @@ export function ConsolePage() {
         wordCardLi.style.display = 'none';        
         readAloudLi.style.display = 'block';
         translateLi.style.display = 'block';
-        explainLi.style.display = 'block';
+        //Explain function is low frequency, so hide it
+        explainLi.style.display = 'none';
       }else{
         wordCardLi.style.display = 'block';
-        readAloudLi.style.display = 'none';   
+        readAloudLi.style.display = 'block';   
         translateLi.style.display = 'none';     
         explainLi.style.display = 'none';    
         wordCardLi.onclick = async (event) => {
@@ -1984,6 +2133,14 @@ export function ConsolePage() {
                 text: `Translate: the '${selectedText}' into Chinese. only output the chinese translation`,
               },
             ]);  
+
+            //mute the audio for AI translation
+            /*
+            const wavStreamPlayer = wavStreamPlayerRef.current;
+            if(wavStreamPlayer){
+              wavStreamPlayer.setMute();
+            }*/
+
           }            
 
         };
@@ -3007,7 +3164,7 @@ export function ConsolePage() {
           properties: {
             selection: {
               type: 'string',
-              description: 'word selecteed',
+              description: 'word selected',
             },           
           },
           required: ['selection'],
@@ -3019,7 +3176,57 @@ export function ConsolePage() {
         return { ok: true };
         //return  'This is a beautiful image';
       }
-    );           
+    ); 
+    // Ask DeepSeek: Chat with deepseek by provided prompt       
+    client.addTool(
+      { 
+        name: 'ask_deepseek',
+        description:
+          `Ask DeepSeek a question by provided prompt
+            #Details
+            - Note that this can take up to 10 seconds, so please provide small updates to the user every few seconds, like 'I just need a little more time'
+          `,
+        parameters: {
+          type: 'object',
+          properties: {
+            prompt: {
+              type: 'string',
+              description: 'prompt for asking DeepSeek',
+            },           
+          },
+          required: ['prompt'],
+        },
+      },
+      async({ prompt }: { prompt: string }) => {
+        const response = await askDeepSeekByPrompt(prompt);
+        if(response){
+          return { ok: true, deepSeekResponse: response, replyByYourself:'No, reply directly with deepseek reply starting by Here is the deepseek reply:' };
+        }
+        return { ok: false, deepSeekResponse: 'No response available from DeepSeek', replyByYourself: 'Yes, you can try to answer the question by yourself starting by Here is my reply due to DeepSeek unavailable now:' };        
+      }
+    );             
+    // Image Creation: Create an image by provided prompt       
+    client.addTool(
+      { 
+        name: 'image_creation',
+        description:
+          'Create an image or a picture by provided prompt',
+        parameters: {
+          type: 'object',
+          properties: {
+            prompt: {
+              type: 'string',
+              description: 'prompt for image/picture creation',
+            },           
+          },
+          required: ['prompt'],
+        },
+      },
+      async({ prompt }: { prompt: string }) => {
+        createImageByPrompt(prompt);
+        return { ok: true };
+      }
+    );         
     // Voice control the on-going playback
     client.addTool(
       { //Voice commands to control the on-going playback, e,g. pause, resume, speed up, speed down, 
@@ -3332,7 +3539,9 @@ export function ConsolePage() {
       const wavStreamPlayer = wavStreamPlayerRef.current;      
 
       // Connect to microphone
-      await wavRecorder.begin();
+      if(wavRecorder.processor === null) {
+        await wavRecorder.begin();
+      }
 
       // Connect to audio output
       // Enhanced with one parameter to resume playback when reply speek is finished
@@ -3448,42 +3657,10 @@ export function ConsolePage() {
       // if connection is not set up yet(first time), recorder processor will be null
       if( wavRecorderRef.current && wavRecorderRef.current.processor ) {
         disConnnectRealtimeAPI();
-      }      
-      /*
-      if( wavRecorderRef.current && wavRecorderRef.current.processor ) {
-        disConnnectRealtimeAPI();
       }
-      connnectRealtimeAPI();*/
+      //connnectRealtimeAPI();
     }
   };
-
-  let wordCardTimeout = null; // Global timeout variable to track dismissal  
-  function showWordCard(x, y, imgURL) {  
-
-    hideContextMenu(); // Hide the context menu    
-
-    const wordCard = document.getElementById("wordCard");
-    wordCard.style.left = `${x}px`;
-    wordCard.style.top = `${y}px`;
-    wordCard.style.display = "block";
-    //wordCard.style.display = "flex";
-    wordCard.style.zIndex = "9999";
-
-    //const wordCardImg = document.getElementById("wordCardImg");
-    //(wordCardImg as HTMLImageElement).src = imgURL;
-
-    // Attach mouse leave event to manage timeout
-    wordCard.onmouseleave = () => {
-      wordCardTimeout = setTimeout(() => {
-        wordCard.style.display = "none";
-      }, 1000); // 3-second delay
-    };
-
-    // Clear the timeout if the mouse re-enters
-    wordCard.onmouseenter = () => {
-        clearTimeout(wordCardTimeout);
-      };        
-  }  
 
   let menuTimeout = null; // Global timeout variable to track dismissal  
   function showContextMenu(x, y) {
@@ -3504,13 +3681,7 @@ export function ConsolePage() {
         clearTimeout(menuTimeout);
       };        
 
-  }
-  
-  function hideWordCard() {
-    const wordCard = document.getElementById("wordCard");
-
-    wordCard.style.display = "none";
-  }    
+  } 
 
   function hideContextMenu() {
     const menu = document.getElementById("contextMenu");
@@ -3573,8 +3744,8 @@ export function ConsolePage() {
       {/* ContextMenu when text selected  */}   
       <div id="contextMenu" style={{position: 'absolute', display: 'none'}}>
         <ul>
-          <li id='wordCardLi'>Word Card/单词卡</li>
-          <li id='readAloudLi'>Read Aloud/大声读</li>
+          <li id='wordCardLi'>Word Card/词卡</li>
+          <li id='readAloudLi'>Read Aloud/朗读</li>
           <li id='translateLi'>Translate/翻译</li>
           <li id='explainLi'>Explain/解释一下</li>
           <li id='searchVideosLi'>Search Videos/相关视频</li>
@@ -4012,7 +4183,7 @@ export function ConsolePage() {
                   iconPosition={'start'}
                   icon={AlignCenter}                  
                   onClick={toggleCaptionVisibility}
-                  disabled={!isAudioExisting}
+                  disabled={!isScriptExisting}
                   className='button'
           />                      
         </div>
@@ -4027,7 +4198,6 @@ export function ConsolePage() {
                   icon={isPlaying ? Pause : Play}
                   buttonStyle={'regular'}
                   onClick={toggleAudio}
-                  //disabled={isAudioExisting() ? false : true}
                   disabled={!isAudioExisting}
                   className='button'
           />
@@ -4039,7 +4209,7 @@ export function ConsolePage() {
         {/* Progress bar area */}
         <div 
           ref={progressBarRef}
-          style={{position: 'relative', width: '60%', backgroundColor: '#ccc', height: '0.625em', borderRadius: '0.3125em', marginTop: '0.2em', marginLeft: '-1px', userSelect: 'none' }}
+          style={{position: 'relative', width: '55%', backgroundColor: '#ccc', height: '0.625em', borderRadius: '0.3125em', marginTop: '0.2em', marginLeft: '-1px', userSelect: 'none' }}
           onMouseDown={isAudioExisting ? handleMouseDown : undefined}>
           <div style={{ 
                         width: `${progress}%`,
@@ -4112,6 +4282,7 @@ export function ConsolePage() {
                         borderRadius: '0.3125em',
                         whiteSpace: 'nowrap',
                         textAlign: 'left',
+                        fontSize: '1.5em',
                         cursor: 'pointer',
                         marginRight: '20px',
                         marginLeft: '10px',
@@ -4196,6 +4367,8 @@ export function ConsolePage() {
         {/*Settings for AI assistant and Realtime API*/} 
         {/*<div style={{display:"flex", marginRight: "0px", marginLeft: isConnected ? "auto" : "1px", justifyContent: "flex-end", zIndex: '9999', userSelect: 'none' }}>            */} 
         <div style={{display:"flex", marginRight: "0px", marginLeft: "auto", justifyContent: "flex-end", zIndex: '9999', userSelect: 'none' }}>            
+          <div title='Realtime Session Countdown' style={{ fontSize: '1em', userSelect: 'none', marginRight: '7px' }}><><CountdownTimer startTime={30} /> </></div>      
+          <div></div>
           <div className="setting-container" style={{display: "flex"}}>
             <Settings style={{ width: '20px', height: '20px',marginLeft: '1px', marginRight: '1px' }}/>
             <div className="setting">
@@ -4255,7 +4428,7 @@ export function ConsolePage() {
                   <option key={2} value={'GPT-4o'}>
                       {'GPT-4o'}
                   </option>
-                  <option key={3} value={'DeepSpeek'}>
+                  <option key={3} value={'DeepSeek'}>
                       {'DeepSeek'}
                   </option>                  
                 </select>                          
