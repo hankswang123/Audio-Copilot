@@ -13,6 +13,7 @@ Audio Copilot enables the interaction with content during playback on-going. It 
 - Audio Copilot. ( Key feature: Interrupt the on-going playback and ask for questions by integrating [OpenAI Realtime API](https://openai.com/index/introducing-the-realtime-api/) )
 - Chatbot integrated to ask question by typing with communicating GPT-4o by [Assistant API](https://platform.openai.com/docs/assistants/overview)
 - Control the player by voice commands. e.g. 'stop', 'resume'...
+- Follow up mode: Play as one of two speakers. -to be done
 - Image Generation by [Recraft.ai](https://www.recraft.ai) for selected Word which is part of function wordCard
 - Screenshot analyzation and read aloud by Realtime API
 - Search Videos by youtube.com integrated by [SERPAPI](https://serpapi.com/search-api)

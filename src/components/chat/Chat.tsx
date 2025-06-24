@@ -13,7 +13,7 @@ type ClientType = RealtimeClient | ZPRealtimeClient;
 type RealtimeClientItemType = ItemType | ZPItemType;
 
 import { Button } from '../button/Button';
-import { Mic, MicOff, Send, Plus, Minus, ArrowLeft, ArrowRight } from 'react-feather';
+import { Mic, MicOff, Send, Play, Plus, Minus, ArrowLeft, ArrowRight } from 'react-feather';
 import { openDB } from 'idb';
 //import { pdfFilePath, audioFilePath } from '../filePaths.js';
 
@@ -84,7 +84,7 @@ const UserMessage = ({ text }: { text: string }) => {
 
   const preprocessText = (text: string) => {
 
-    if (text.includes('Read Aloud:') || text.includes('Translate:') ) {
+    if (text.includes('Read Aloud:') || text.includes('Translate:') || text.includes('wordcard:') ) {
       //return 'Describe Selection';
       return '';
     }  
@@ -113,7 +113,7 @@ const UserMessage = ({ text }: { text: string }) => {
 
   switch (messageType) {
     case "text":
-      if(!text.includes('Read Aloud:') ){
+      if(!text.includes('Read Aloud:') && !text.includes('Translate:') && !text.includes('wordcard:') ){
         return <div className={styles.userMessage}>
                 <Markdown rehypePlugins={[rehypeRaw]}
                 >{preprocessText(text)}</Markdown>
@@ -626,13 +626,45 @@ const Chat = forwardRef(({ functionCallHandler = () => Promise.resolve(""), getI
         setUserInput("");
         console.log('DeepSpeek model');
         const query = userInput;
-        const response: Response = await fetch(`http://localhost:3001/api/deepseek/chat?q=${encodeURIComponent(query)}`);
+        const response: Response = await fetch(`http://localhost:3001/api/deepseek/chat/stream?q=${encodeURIComponent(query)}`);
+        //const response: Response = await fetch(`http://localhost:3001/api/deepseek/chat?q=${encodeURIComponent(query)}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }        
 
+        // reply with streaming model
+        appendMessage("assistant", "");
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");        
+        let wholeText = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            /*
+            appendToLastMessage('\n');
+            appendToLastMessage(`<button click='Prompt('Hi There')'>Read Aloud</button>`);    
+            appendToLastMessage('\n');
+            appendToLastMessage(`<div><Play style={{ width: '13px', height: '13px' }} /></div>`);
+            if(wholeText){          
+              realtimeClient.sendUserMessageContent([
+                {
+                  type: `input_text`,
+                  text: `Read Aloud: ${wholeText} with slow speed and with clear and encourage tone. only output the read aloud content and donot output the transcript`,
+                },
+              ]); 
+            }*/              
+            break;
+          }
+    
+          const text = decoder.decode(value);
+          wholeText += text;
+          appendToLastMessage(text);
+        }          
+
+        /* Previous logic without streaming        
         const resp: any = await response.json();
-        appendMessage("assistant", resp);
+        appendMessage("assistant", resp);*/
+
         break;
 
       default:

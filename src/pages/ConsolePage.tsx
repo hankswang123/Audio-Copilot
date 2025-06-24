@@ -28,7 +28,7 @@ type RealtimeClientItemType = ItemType | ZPItemType;
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
 import { WavRenderer } from '../utils/wav_renderer';
 
-import {AlignCenter, Key, Layout, Book, BookOpen, TrendingUp, X, Zap, Edit, Edit2, Play, Pause, Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight, Settings, Repeat, SkipBack, UserPlus, ZoomOut, ZoomIn, User, Volume } from 'react-feather';
+import {AlignCenter, Key, Layout, Book, BookOpen, TrendingUp, X, Zap, Edit, Edit2, Play, Pause, Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight, Settings, Repeat, SkipBack, SkipForward, Globe, UserPlus, ZoomOut, ZoomIn, User, Volume } from 'react-feather';
 
 import { Document, Page } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -423,7 +423,7 @@ export function ConsolePage() {
                     type: `input_text`,
                     text: `Read Aloud: ${response}. 
                     The output should follow the format:
-                    Screenshot Description:                      
+                    <b>Screenshot Description</b>:                      
                     - {Each sentence of the response}`,
                   },
                 ]);  
@@ -1664,6 +1664,21 @@ export function ConsolePage() {
     }   
   }  
 
+  const repeatForward = () => {
+
+    const currentCaptionIndex = audioCaptions.current.findIndex((caption, index) => {
+      const nextCaption = audioCaptions.current[index + 1];
+      return currentTime >= caption.time && (!nextCaption || currentTime < nextCaption.time);
+    });      
+
+    if(currentCaptionIndex > 0){
+      const nextCaption = audioCaptions.current[currentCaptionIndex + 1];
+      if(nextCaption){
+        audioRef.current.currentTime = nextCaption.time;      
+      }
+    }  
+  }
+
   const repeatCurrent = () => {
 
     const currentCaptionIndex = audioCaptions.current.findIndex((caption, index) => {
@@ -1678,6 +1693,29 @@ export function ConsolePage() {
       playPauseBtnRef.current.click(); // Trigger the button click event
     }    
 
+  }  
+
+  const translateSentence = (sentence: string) => { 
+    const client = clientRef.current;
+    if(client.isConnected()){
+        client.sendUserMessageContent([
+        {
+          type: `input_text`,
+          text: `Translate: the '${sentence}' into Chinese. only output the chinese translation with one(at least) to five(most) keywords according to your understanding(e.g. words with long length or difficult prouncation should be chosen as keywords). 
+          follow bellow format strictly:
+          "{Chinese Translation}" \n -<b>"{keyword1 in English}"</b>是"{Chinese of keyword1}"的意思 \n -<b>{keyword2 in English}</b>是{Chinese of keyword2}的意思 \n -<b>{keyword3 in English}</b>是{Chinese of keyword3}的意思 \n -<b>{keyword4 in English}</b>是{Chinese of keyword4}的意思 \n -<b>{keyword5 in English}</b>是{Chinese of keyword5}的意思
+          \n Example:
+          "The cat is on the mat" -> "猫在垫子上. \n -"cat"是"猫"的意思\n -"mat"是"垫子"的意思"`,
+        },
+      ]);  
+
+    }    
+  }
+
+  const translateCurrentCaption = () => {
+    if(currentCaption){
+      translateSentence(currentCaption);
+    }
   }  
 
   //Update the progress bar and current time when the audio is playing
@@ -1918,6 +1956,26 @@ export function ConsolePage() {
        - {usage example1 in English} ({chinese translation1})
        - {usage example2 in English} ({chinese translation1})
       `});     */
+
+      
+    const client = clientRef.current;
+    if(client.isConnected()){
+        client.sendUserMessageContent([
+        {
+          type: `input_text`,
+          text: `wordcard: Show word card about ${word} in a way that is easy and fun for a young child to understand with tone Lighthearted, playful, and encouraging.       
+                  Provide Chinese meaning, part of speech and English phonetic transcription in one line with splitter slash and a new line with two usage examples in English with also their chinese translation for the given word. The two English usage examples should prefer to use the simple words in the sentence. Only output the content and skip the words, e.g. 'Chinese meaning:', 'Part of speech:' or 'English phonetic transcription:'.
+                  The output should follow the format:
+                  <b>${word}</b>: {chinese meaning1};{chinese meaning2} / {part of speech} / {International Phonetic Alphabet}<br />
+                  Usage Examples:
+                  - {usage example1 in English} ({chinese translation1})
+                  - {usage example2 in English} ({chinese translation1})
+          `,
+        },
+      ]);  
+    }  
+
+      /*
     clientRef.current.updateSession({instructions: `
       # Personality and Tone
       ## Identity
@@ -1957,40 +2015,27 @@ export function ConsolePage() {
     await sleep(1500);    
     //restore the original instructions
     clientRef.current.updateSession({ instructions: instructions.current }); 
-
-    /*
-    let imgURL = localStorage.getItem(`tmp::${word}`);
-    if(imgURL !== null && imgURL.length > 0){
-      if(imgURL.includes(' ')){
-        await chatRef.current.updateImage(`\n![Image Could not be loaded](${encodeURIComponent(imgURL)})\n`);
-      }else{
-        await chatRef.current.updateImage(`![Image Could not be loaded](${imgURL})`);      
-      } 
-      return;     
-    }*/
+*/
 
     //Generate image by recraft.ai for the given word at the first time
     const response: Response = await fetch(`http://localhost:3001/api/recraft/image?magzine=${encodeURIComponent(newMagzine)}&word=${(word)}`);    
+    /*
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    }*/
 
-    console.log('after image request');
-    const image: any = await response.json();      
-    const imgURL = image.imgURL;
-    const prompt = image.prompt;    
-    console.log(imgURL);
-    //localStorage.setItem(`tmp::${word}`, imgURL);
-   
-    if(imgURL.includes(' ')){
-      await chatRef.current.updateGenImage(`![Image Could not be loaded](${encodeURIComponent(imgURL)}  "${prompt}")`);
-    }else{
-      //with request with timestamp parameter will lead to frontpage refresh after image generated is saved in backend
-      //await chatRef.current.updateImage(`![Image Could not be loaded](${imgURL}?t=${Date.now()})`);
-      //await chatRef.current.updateGenImage(`![Image Could not be loaded](${imgURL})`);
-      //await chatRef.current.updateGenImage(`![Image Could not be loaded](${encodeURIComponent(imgURL)} "${prompt}")`);
-      await chatRef.current.updateGenImage(`![Image Could not be loaded](${imgURL} "${prompt}")`);
-    }   
+    if(response.ok){
+      const image: any = await response.json();      
+      const imgURL = image.imgURL;
+      const prompt = image.prompt;    
+      console.log(imgURL);
+    
+      if(imgURL.includes(' ')){
+        await chatRef.current.updateGenImage(`![Image Could not be loaded](${encodeURIComponent(imgURL)}  "${prompt}")`);
+      }else{
+        await chatRef.current.updateGenImage(`![Image Could not be loaded](${imgURL} "${prompt}")`);
+      }   
+    }
     
   }
 
@@ -2101,11 +2146,7 @@ export function ConsolePage() {
       //let selectionTxt = getSelectedText().trim();
       //readAloudLi.onclick = () => selectionTTS(selectedText);
       if(readAloudLi.style.display === 'block'){
-        //readAloudLi.onclick = () => {chatRef.current.chatFromExternal(`Read Aloud about '${selectedText}' and explain to me its chinese meaning  and provide to two usage examples in English.`);};
-        readAloudLi.onclick = () => {
-          
-          //chatRef.current.chatFromExternal(`Read Aloud about '${selectedText}'.`);
-
+        readAloudLi.onclick = () => {          
           // Read Aloud the selected text from LLM
           const client = clientRef.current;
           if(client.isConnected()){
@@ -2122,27 +2163,7 @@ export function ConsolePage() {
 
       if(translateLi.style.display === 'block'){
         translateLi.onclick = () => {
-          //chatRef.current.chatFromExternal(`Translate the '${selectedText}' into Chinese.`);
-        
-          // Read Aloud the selected text from LLM
-          const client = clientRef.current;
-          if(client.isConnected()){
-              client.sendUserMessageContent([
-              {
-                type: `input_text`,
-                text: `Translate: the '${selectedText}' into Chinese. only output the chinese translation`,
-              },
-            ]);  
-
-            //mute the audio for AI translation
-            /*
-            const wavStreamPlayer = wavStreamPlayerRef.current;
-            if(wavStreamPlayer){
-              wavStreamPlayer.setMute();
-            }*/
-
-          }            
-
+          translateSentence(selectedText);           
         };
       }      
       
@@ -2340,7 +2361,26 @@ export function ConsolePage() {
           (searchBox as HTMLInputElement).value = ''; // Clear the search box
 
         }
-      }else if (e.code === 'Enter') { 
+      }
+      else if(e.code === 'ArrowLeft'){
+        const repeatPreviousLi = document.getElementById('repeatPreviousLi');
+        if(repeatPreviousLi){
+          repeatPreviousLi.click();
+        }
+      }
+      else if(e.code === 'ArrowRight'){
+        const repeatForwardLi = document.getElementById('repeatForwardLi');
+        if(repeatForwardLi){
+          repeatForwardLi.click();
+        }
+      }   
+      else if(e.code === 'ArrowDown'){
+        const repeatCurrentLi = document.getElementById('repeatCurrentLi');
+        if(repeatCurrentLi){
+          repeatCurrentLi.click();
+        }
+      }         
+      else if (e.code === 'Enter') { 
         // When Enter is hit in the search box, search for the video       
         if (e.target === searchBox) {
           e.preventDefault();
@@ -3184,7 +3224,7 @@ export function ConsolePage() {
         description:
           `Ask DeepSeek a question by provided prompt
             #Details
-            - Note that this can take up to 10 seconds, so please provide small updates to the user every few seconds, like 'I just need a little more time'
+            - Note that this function call can take up to 10 seconds, so please provide small updates to the user every few seconds, like 'I just need a little more time'
           `,
         parameters: {
           type: 'object',
@@ -3202,8 +3242,8 @@ export function ConsolePage() {
         if(response){
           return { ok: true, deepSeekResponse: response, replyByYourself:'No, reply directly with deepseek reply starting by Here is the deepseek reply:' };
         }
-        return { ok: false, deepSeekResponse: 'No response available from DeepSeek', replyByYourself: 'Yes, you can try to answer the question by yourself starting by Here is my reply due to DeepSeek unavailable now:' };        
-      }
+        return { ok: false, deepSeekResponse: 'No response available from DeepSeek', replyByYourself: 'Yes, you can try to answer the question by yourself starting by Here is my reply due to DeepSeek unavailable now:' };             
+      }     
     );             
     // Image Creation: Create an image by provided prompt       
     client.addTool(
@@ -3786,8 +3826,10 @@ export function ConsolePage() {
 
       {/* Floating buttons for control the caption size and repeat current/last caption */}
       <ul className="floating-captionsize" style={{display: !isCaptionVisible && 'none' }}>
-        <li onClick={repeatCurrent}><div title='Repeat current caption'><Repeat style={{ width: '13px', height: '13px' }} /></div></li>
-        <li onClick={repeatPrevious}><SkipBack style={{ width: '13px', height: '13px' }} /></li>
+        <li onClick={repeatCurrent}id='repeatCurrentLi'  title='Repeat current caption'><Repeat style={{ width: '13px', height: '13px' }} /></li>
+        <li onClick={repeatPrevious} id='repeatPreviousLi'><SkipBack style={{ width: '13px', height: '13px' }} /></li>
+        <li onClick={repeatForward} id='repeatForwardLi'><SkipForward style={{ width: '13px', height: '13px' }} /></li>
+        <li onClick={translateCurrentCaption} title='Translation'><Globe style={{ width: '13px', height: '13px' }} /></li>
         <li onClick={() => adjustCaptionFontSize(+0.1)}><ZoomIn style={{ width: '13px', height: '13px' }} /></li>
         <li onClick={() => adjustCaptionFontSize(-0.1)}><ZoomOut style={{ width: '13px', height: '13px' }} /></li>
       </ul>
@@ -4171,7 +4213,7 @@ export function ConsolePage() {
         {isCaptionVisible && ( 
           <div id='captionDisplay' className="caption-display"
                dangerouslySetInnerHTML={{ __html: currentCaption }}
-               style={{ fontSize: '2em', marginTop: '20px', width: `${captionWidth}%`, opacity: '1' }}
+               style={{ fontSize: '2.95em', marginTop: '20px', width: `${captionWidth}%`, opacity: '1' }}
           ></div> )
         } 
 

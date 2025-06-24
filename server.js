@@ -119,6 +119,45 @@ app.get("/api/deepseek/chat", async (req, res) => {
     }
 });
 
+// Call deepseek API to chat by stream mode
+app.get("/api/deepseek/chat/stream", async (req, res) => {
+    try {
+        console.log('deepseek chat by stream mode is called');
+
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");        
+
+        const { q } = req.query;
+
+        const deepseek = new OpenAI({
+            baseURL: process.env.DEEPSEEK_BASE_URL,
+            apiKey: process.env.DEEPSEEK_API_KEY, 
+            });
+
+        const response = await deepseek.chat.completions.create(  {  
+            model: 'deepseek-chat',  
+            messages: [
+                { role: 'system', content: '你是一个百科全书，用有趣的方式回答用户提出的各种问题.' },
+                { role: 'user', content: q},
+            ],
+            stream: true, // Enable streaming
+        });
+
+        for await (const chunk of response) {
+            //res.write(`data: ${JSON.stringify(chunk.choices[0].delta.content)}\n\n`);
+            res.write(`${chunk.choices[0].delta.content}`);
+            console.log(`delta reply from DS: ${JSON.stringify(chunk.choices[0].delta.content)}\n\n`);
+          }
+        
+        res.end(); 
+          
+    } catch (error) {
+        console.error("Detailed error:", error);
+        res.status(600).json({ error: 'Failed to get response from deepseek', details: error.message });
+    }
+});
+
 //Deepseek: Generate Prompt for word card image generation
 const promptGen_ds = async (word) => { 
     try{

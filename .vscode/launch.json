@@ -1,6 +1,12 @@
 {
     "version": "0.2.0",
-    "configurations": [      
+    "compounds": [
+      {
+        "name": "Debug Full Stack",
+        "configurations": ["Chrome", "Node.js"]
+      }
+    ],    
+    "configurations": [            
       {
         "name": "Chrome",
         "type": "chrome",
@@ -11,10 +17,21 @@
         "trace": true
       },
       {
+        "name": "Node.js",
+        "type": "node",
+        "request": "attach",
+        "port": 9229,
+        "restart": true,
+        "sourceMaps": true,
+        "skipFiles": ["<node_internals>/**"],
+        "autoAttachChildProcesses": true
+      },      
+      {
           "name": "Debug Transcribe Script",
           "type": "node",
           "request": "launch",
-          "program": "${workspaceFolder}/src/util/fetch_scripts.js", // Path to transcribe.js
+          "runtimeExecutable": "C:/Users/I058700/AppData/Local/fnm_multishells/36192_1739597603088/node.exe",           
+          "program": "${workspaceFolder}/src/utils/fetch_scripts.js", // Path to transcribe.js
           "skipFiles": ["<node_internals>/**"],
           "console": "integratedTerminal"
       }

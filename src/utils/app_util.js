@@ -3,15 +3,20 @@
 // to be used in the dropdown
 // The FIRST magzine in the list will be the default magzine
 export const magzines = [
+    //"National_Geographic_Little_Kids_-_March_2023",
+    //"National_Geographic_Little_Kids_-_January_2022",
+    //"National_Geographic_Little_Kids_-_July_2023",
     //"National_Geographic_Little_Kids_USA_-_January-February_2024",
     //"National_Geographic_Little_Kids_UK_-_Issue_23_2024",
     //"National_Geographic_Little_Kids_USA_-_September-October_2024",
-    "National_Geographic_Little_Kids_USA_-_January-February_2025",
-    "National_Geographic_Little_Kids_UK_-_Issue_27_2025",
-    "After School, Traffic Safety, Animals, Toys",
-    "In the Playground, Weather, Clothes",
-    "Back to School, Lunchtime, and Park Colors",
-    "National_Geographic_Little_Kids_USA_-_November-December_2024"
+    //"National_Geographic_Little_Kids_USA_-_January-February_2025",
+    //"National_Geographic_Little_Kids_UK_-_Issue_27_2025",
+    //"After School, Traffic Safety, Animals, Toys",
+    //"In the Playground, Weather, Clothes",
+    //"Back to School, Lunchtime, and Park Colors",
+    "My morning",
+    "National_Geographic_Little_Kids_-_September_2022"
+    //"National_Geographic_Little_Kids_USA_-_November-December_2024"
     //"ngl_sep_lite"
 ];
 
@@ -162,7 +167,7 @@ export async function buildInstructions({magzine} = {magzine: magzines[0]}) {
             - Example: “Okay, I’m going to ask deepseek now.”
             - Example: "Let me create a picture for you."
         - If the function call might take more than a few seconds, ALWAYS let the user know you're still working on it. (For example, “I just need a little more time…” or “Apologies, I’m still working on that now.”)
-        - Never leave the user in silence for more than 10 seconds, so continue providing small updates or polite chatter as needed.
+        - Never leave the user in silence for more than 3 seconds, so continue providing small updates or polite chatter as needed.
         - Example: “I appreciate your patience, just another moment…” or “I’m still working on that, thank you for waiting.”                
         `;
         if (magzine === 'no_scripts') {
@@ -202,7 +207,7 @@ export async function buildInstructions({magzine} = {magzine: magzines[0]}) {
             - Example: “Okay, I’m going to ask deepseek now.”
             - Example: "Let me create a picture for you."
         - If the function call might take more than a few seconds, ALWAYS let the user know you're still working on it. (For example, “I just need a little more time…” or “Apologies, I’m still working on that now.”)
-        - Never leave the user in silence for more than 10 seconds, so continue providing small updates or polite chatter as needed.
+        - Never leave the user in silence for more than 3 seconds, so continue providing small updates or polite chatter as needed.
         - Example: “I appreciate your patience, just another moment…” or “I’m still working on that, thank you for waiting.”                
 
         Instructions:
