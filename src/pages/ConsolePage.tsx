@@ -42,8 +42,6 @@ import { Button } from '../components/button/Button';
 import SessionControls from "../components/webrtc/SessionControls";
 import html2canvas from 'html2canvas';
 
-//import WebSocket from "ws";
-
 /**
  * Type for all event logs
  */
@@ -383,7 +381,7 @@ export function ConsolePage() {
             //startLoading(); // 开始加载动画
             //await Promise.resolve();
 
-          // 获取选区元素
+            // 获取选区元素
             const selectionElement = selectionRef.current;
             if (selectionElement) {
 
@@ -410,14 +408,17 @@ export function ConsolePage() {
               });     
 
               const imgURL = canvas.toDataURL('image/png');
+              console.log(imgURL);  
               await chatRef.current.updateScreenshot(imgURL);
-              const response = await analyzeImage(imgURL);
+              //skip calling gpt-4o describe the image
+              //const response = await analyzeImage(imgURL);
 
               stopLoading(); // 停止加载动画    
 
               // Read Aloud the image description from LLM
               const client = clientRef.current;
               if(client.isConnected()){
+                /* skip calling gpt-4o describe the image
                   client.sendUserMessageContent([
                   {
                     type: `input_text`,
@@ -426,7 +427,20 @@ export function ConsolePage() {
                     <b>Screenshot Description</b>:                      
                     - {Each sentence of the response}`,
                   },
-                ]);  
+                ]);  */
+
+                /* Send image to realtime API directly. 
+                due to update: https://openai.com/index/introducing-gpt-realtime/
+                with 'image input' allowed 
+                Model has to be set as 'gpt-realtime' to use this feature.
+                */
+                client.sendUserMessageContent([
+                {
+                  type: `input_image`,
+                  image_url: imgURL,
+                } as any, // 'as any' used to bypass TypeScript checks
+                ]);       // This shows how to send msg type not supported by default
+
               }
 
               // 下载截图
@@ -1350,31 +1364,6 @@ export function ConsolePage() {
       }            
     }
   }, [dotCount, isMuteBtnDisabled]);  
-
-  //tbd: why response.ok is always true even the audio file is not existing
-  // Check if the server has cache issue
-  /*
-  const isAudioExisting = async () => {
-    try {
-      const response = await fetch(`./play/${newMagzine}/${newMagzine}.wav`, {
-        method: 'HEAD', // Or 'GET' depending on your needs
-      });
-  
-      if (response.ok) {
-        console.log('Audio exists!');
-        return true;
-      } else if (response.status === 404) {
-        console.log('Audio not found.');
-        return false;
-      } else {
-        console.log(`Unexpected status: ${response.status}`);
-        return false;
-      }
-    } catch (error) {
-      console.error('Error checking resource:', error);
-      return false;
-    }  
-  };  */
 
   // Load the audio file when the component mounts
   useEffect(() => {
@@ -2833,7 +2822,9 @@ export function ConsolePage() {
           throw new Error(`Already connected, use .disconnect() first`);
         }
         //await client.realtime.connect({ model: 'gpt-4o-realtime-preview-2024-12-17' });
-        await client.realtime.connect({ model: 'gpt-4o-mini-realtime-preview-2024-12-17' });
+        //await client.realtime.connect({ model: 'gpt-4o-mini-realtime-preview-2024-12-17' });
+        //test with the latest GA version: gpt-realtime
+        await client.realtime.connect({ model: 'gpt-realtime' });
         client.updateSession();            
         /* End of inside logic client.connect() */
 
@@ -4454,12 +4445,12 @@ export function ConsolePage() {
               {/*Assistant ID regeneration*/} 
               <div className="speed-controls">
                 <div title='Regenerate Assistant ID'><UserPlus style={{ width: '13px', height: '13px' }} />:</div>
-                <div>{localStorage.getItem('tmp::asst_id').slice(0, 5)}...</div>
+                <div>{localStorage.getItem('tmp::asst_id')?.slice(0, 5) ?? ''}...</div> 
               </div>               
               {/*API Key Reset*/}     
               <div className="speed-controls">
                 <div title='Reset API Key'><Edit style={{ width: '13px', height: '13px' }} onClick={() => resetAPIKey()} />:</div>
-                <div>{localStorage.getItem('tmp::voice_api_key').slice(0, 3)}...</div>                
+                <div>{localStorage.getItem('tmp::voice_api_key')?.slice(0, 5) ?? ''}...</div>               
               </div> 
               <div className="speed-controls">
                 <div title='Chat Models'><Edit2 style={{ width: '13px', height: '13px' }} />:</div>
