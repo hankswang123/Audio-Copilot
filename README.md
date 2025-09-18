@@ -26,6 +26,7 @@ Audio Copilot enables the interaction with content during playback on-going. It 
     - Prompt example: Use very simple and interesting English words, the target audence is for grade 1 student. Tone should be supportive and encouraging. Also repeat some keywords letter by letter according to you judgement.
 - Step 3 - Generate the scripts by uploading podcast to [Tongyi->Efficiency](https://tongyi.aliyun.com/efficiency)， [Fireflies](https://app.fireflies.ai/) or [Google AI Studio](https://aistudio.google.com/prompts/new_chat)
     - Tongyi Efficiency supports editting the transribed scripts dynamically
+    - **Tongyi now support export the scripts generated** and exported scripts could be used by default without any modification
 - Step 4 - User could engage an realtime dicussion by Audio Copilot during listening podcast and reading the magzine.
 - Step 5 - Additional features: analyze selected screenshot, word card...
 

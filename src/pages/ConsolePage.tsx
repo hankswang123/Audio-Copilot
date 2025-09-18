@@ -67,6 +67,101 @@ export function ConsolePage() {
     localStorage.setItem('tmp::voice_api_key', apiKey);
   }*/
 
+  const screenStreamRef = useRef(null);
+  const videoElementRef = useRef(null);    
+
+  let screenStream = null; // keep the stream globally if needed
+  let videoElement = null; // reuse this
+  async function initScreenCapture() {
+    if (!screenStream) {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+
+      // create hidden video once
+      videoElement = document.createElement("video");
+      videoElement.srcObject = screenStream;
+      videoElement.autoplay = true;
+      videoElement.muted = true;
+      videoElement.style.display = "none";
+      document.body.appendChild(videoElement);
+
+      // wait until ready
+      await new Promise(resolve => {
+        videoElement.onloadedmetadata = resolve;
+      });
+    }
+  }
+  
+  async function captureScreenBase64() {
+    try {
+      // If you don’t have a stream yet, request it
+      if (!screenStream) {
+        console.log('Requesting screen capture permission...');
+        screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        videoElement = document.createElement("video");
+        videoElement.srcObject = screenStream;
+        videoElement.autoplay = true;
+        videoElement.muted = true;
+        videoElement.style.display = "none";
+        document.body.appendChild(videoElement);        
+
+        await new Promise<void>((resolve) => {
+          videoElement.onloadedmetadata = () => {
+            resolve();
+          };
+        });   
+        
+        // Wait a tiny bit to ensure the first frame is rendered
+        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay        
+        
+      }else{
+        console.log('Reusing existing screen capture stream...');
+      }
+
+      // Make sure video is playing
+      if (videoElement.readyState < 2) { // HAVE_CURRENT_DATA
+        await videoElement.play();
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }      
+
+      await videoElement.play(); 
+      /*
+      if (!videoElement) {
+        videoElement = document.createElement("video");
+        videoElement.srcObject = screenStream;
+        videoElement.autoplay = true;
+        videoElement.muted = true;
+        videoElement.style.display = "none";
+        document.body.appendChild(videoElement);
+      }
+      
+      const video = document.createElement("video");
+      video.srcObject = screenStream;
+
+      // Wait until video metadata is ready
+      await video.play(); 
+      */
+
+      // Create canvas
+      const canvas = document.createElement("canvas");
+      canvas.width = videoElement.videoWidth;
+      canvas.height = videoElement.videoHeight;
+      const ctx = canvas.getContext("2d");
+
+      // Draw the current frame
+      ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+      // Convert to Base64 PNG
+      const base64 = canvas.toDataURL("image/png");
+      return base64;
+
+      // Do NOT stop the stream yet
+      // stream.getTracks().forEach(track => track.stop());
+    } catch (err) {
+      console.error("Failed to capture screen:", err);
+      return null;
+    }
+  }  
+
   //Timer of SearchBox animation effect for Youtube Video
   let animation: NodeJS.Timeout;    
 
@@ -87,8 +182,8 @@ export function ConsolePage() {
     new WavStreamPlayer({ sampleRate: 24000 })
   );
 
-  const isRealtimeClient = true;
-  //const isRealtimeClient = false;
+  //const isRealtimeClient = true;
+  const isRealtimeClient = false;
   const clientRef = useRef<ClientType>(
     isRealtimeClient ?
     new RealtimeClient(
@@ -108,31 +203,6 @@ export function ConsolePage() {
           }
     )
   );  
-
-  /*
-  const clientRef = useRef<RealtimeClient>(
-    new RealtimeClient(
-      LOCAL_RELAY_SERVER_URL
-        ? { url: LOCAL_RELAY_SERVER_URL }
-        : {
-            apiKey: apiKey,
-            dangerouslyAllowAPIKeyInBrowser: true,
-          }
-    )
-  );*/
-
-
-  /*
-  const clientRef = useRef<ZPRealtimeClient>(
-    new ZPRealtimeClient(
-      LOCAL_RELAY_SERVER_URL
-        ? { url: LOCAL_RELAY_SERVER_URL }
-        : {
-            apiKey: apiKey,
-            dangerouslyAllowAPIKeyInBrowser: true,
-          }
-    )
-  );  */
 
   /**
    * References for
@@ -155,15 +225,10 @@ export function ConsolePage() {
   /**
    * All of our variables for displaying application state
    * - items are all conversation items (dialog)
-   * - memoryKv is for set_memory() function
-   * - coords, marker are for get_weather() function
    */
   const [items, setItems] = useState<RealtimeClientItemType[]>([]);
-  //const [items, setItems] = useState<ItemType[]>([]);
-  //const [items, setItems] = useState<ZPItemType[]>([]);
   const [realtimeEvents, setRealtimeEvents] = useState<RealtimeEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
 
   //hanks - Implementation of audio copilot
   const [isPlaying, setIsPlaying] = useState(false);
@@ -174,7 +239,6 @@ export function ConsolePage() {
   const [playbackVolume, setPlaybackVolume] = useState(0.75); // State to control playback speed
   const [rtVoice, setRtVoice] = useState<'ash' | 'alloy' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse'>('alloy'); // State to control realtime voice speed
   const [keyword, setKeyword] = useState(''); // State to store keyword
-  //const [keyWordMode, setKeyWordMode] = useState(false); // keyword mode: loop keyword audio
   const [isHidden, setIsHidden] = useState(true); // State to control audio/video visibility
   const [isDragging, setIsDragging] = useState(false);
   const [isProgressDragging, setIsProgressDragging] = useState(false);
@@ -434,13 +498,31 @@ export function ConsolePage() {
                 with 'image input' allowed 
                 Model has to be set as 'gpt-realtime' to use this feature.
                 */
+               /* for debugging purpose
+                console.log('relative X Position', relativeX);
+                console.log('relative Y Position', relativeY);
+                console.log('Selection Box Width', selectionBox.width);
+                console.log('Selection Box Height', selectionBox.height);
+                console.log('Viewport X Position', containerRect.scrollX);
+                console.log('Viewport Y Position', containerRect.scrollY);
+                console.log('Viewport Width', containerRect.width);
+                console.log('Viewport Height', containerRect.height); */
+
+               /*
+                const base64Image = await captureScreenBase64();
+                client.sendUserMessageContent([
+                {
+                  type: `input_image`,
+                  image_url: base64Image,
+                } as any, // 'as any' used to bypass TypeScript checks
+                ]);       // This shows how to send msg type not supported by default   
+                */
                 client.sendUserMessageContent([
                 {
                   type: `input_image`,
                   image_url: imgURL,
                 } as any, // 'as any' used to bypass TypeScript checks
-                ]);       // This shows how to send msg type not supported by default
-
+                ]);       // This shows how to send msg type not supported by default                   
               }
 
               // 下载截图
@@ -456,7 +538,7 @@ export function ConsolePage() {
     };
 
     const button = document.createElement('button');
-    button.textContent = 'Describe Selection';
+    button.textContent = 'Talk about snapshot';
     button.onclick = imgDescribe;
     button.style.width = '140px'; 
     button.style.padding = '4px 8px';
@@ -571,6 +653,16 @@ export function ConsolePage() {
   useEffect(() => {
     setAudioExisting(); // Call the async function
   }, []);   
+
+  // Check if there are any keywords with count > 0
+  // Keywords icon display control
+  const hasKeywords = React.useMemo(
+    () =>
+      Object.values(newKeywords).some(
+        (entry) => Array.isArray(entry) && entry[2] !== 0
+      ),
+    [newKeywords]
+  );  
 
   useEffect(() => {
     instructions.current = newInstructions; // Sync ref with the updated state
@@ -1703,6 +1795,9 @@ export function ConsolePage() {
 
   const translateCurrentCaption = () => {
     if(currentCaption){
+      if (isPlaying && playPauseBtnRef.current) {
+        playPauseBtnRef.current.click(); // Stop the audio if it's playing
+      }
       translateSentence(currentCaption);
     }
   }  
@@ -2315,15 +2410,24 @@ export function ConsolePage() {
       if (e.code === 'Space') {
         //if (e.target !== searchBox || e.target !== chatInputBox) {
           if (e.target !== chatInputBox && e.target !== webRTCMessage && e.target !== menuInput) {
-          e.preventDefault(); // Prevent default space bar action (scrolling)
-          if (playPauseBtnRef.current) {
-            playPauseBtnRef.current.click(); // Trigger the button click event
+          e.preventDefault(); // Prevent default space bar action (scrolling)        
+          /*  
+          if(isAudioExisting === false){
+            //if no audio available, Space shortcut is used for Mute/Unmute GPT-Realtime
+            if (muteBtnRef.current)
+              muteBtnRef.current.click();
+            return;
+          } else{*/
+            if (playPauseBtnRef.current) {
+              playPauseBtnRef.current.click(); // Trigger the button click event
 
-            const wavStreamPlayer = wavStreamPlayerRef.current;
-            if(wavStreamPlayer){
-              wavStreamPlayer.askStop = true; 
-            } 
-          }      
+              const wavStreamPlayer = wavStreamPlayerRef.current;
+              if(wavStreamPlayer){
+                wavStreamPlayer.askStop = true; 
+              } 
+            }
+          //} 
+          
         }  
       } else if (e.code === 'Escape') {
 
@@ -2424,6 +2528,7 @@ export function ConsolePage() {
   }
 
   const toggleAudio = async () => {
+    if(isAudioExisting === false){ return; }
     if (audioRef.current && isHidden) {
       if (isPlaying) {
         //audio should be paused when User speaks or LLM speaks
@@ -2845,9 +2950,6 @@ export function ConsolePage() {
    */
   const switchAudioCopilotOff = useCallback(async () => {
     setIsConnected(false);
-    //setRealtimeEvents([]);
-    //setItems([]);
-    setMemoryKv({});
 
     const client = clientRef.current;
     client.disconnect();
@@ -3061,36 +3163,6 @@ export function ConsolePage() {
     client.updateSession({ turn_detection: { type: 'server_vad' } });    
     // hanks
 
-    // Add tools - Functions(Calling) that can be called by the client
-    client.addTool(
-      {
-        name: 'set_memory',
-        description: 'Saves important data about the user into memory.',
-        parameters: {
-          type: 'object',
-          properties: {
-            key: {
-              type: 'string',
-              description:
-                'The key of the memory value. Always use lowercase and underscores, no other characters.',
-            },
-            value: {
-              type: 'string',
-              description: 'Value can be anything represented as a string',
-            },
-          },
-          required: ['key', 'value'],
-        },
-      },
-      async ({ key, value }: { [key: string]: any }) => {
-        setMemoryKv((memoryKv) => {
-          const newKv = { ...memoryKv };
-          newKv[key] = value;
-          return newKv;
-        });
-        return { ok: true };
-      }
-    );
     // Search news from google
     client.addTool(
       { //Capabilities demo: when a listener wants to ask for a google search
@@ -3640,7 +3712,6 @@ export function ConsolePage() {
     setRealtimeEvents([]);
     setItems([]);
     await chatRef.current.updateItems([]);
-    setMemoryKv({});
 
     const client = clientRef.current;
     client.disconnect();
@@ -4303,7 +4374,7 @@ export function ConsolePage() {
             }}    onClick={(e) => handleVolumeControlClick(e, 1.0)}>Louder</div>   
 
             <div><span className="separator">|</span></div>
-            <div className="tooltip-container" style={{userSelect: 'none'}}>
+            <div className="tooltip-container" style={{userSelect: 'none', display: hasKeywords ? 'flex' : 'none' }}>
               <div title={keyword === '' ? 'Select a Keyword to Dive in' : '' }><BookOpen color='blue' style={{ width: '17px', height: '17px' }} /></div>
               <div className="tooltip" style={{backgroundColor: 'rgb(255, 255, 255, 1)', width: 'auto', height: 'auto'}}>
                 <ul style={{listStyle: 'none', marginLeft:'10px', textAlign: 'left', padding: '0px'}}> 

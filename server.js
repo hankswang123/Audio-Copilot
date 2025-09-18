@@ -154,6 +154,7 @@ app.get("/api/deepseek/chat/stream", async (req, res) => {
           
     } catch (error) {
         console.error("Detailed error:", error);
+        console.log('API Key:', process.env.DEEPSEEK_API_KEY);
         res.status(600).json({ error: 'Failed to get response from deepseek', details: error.message });
     }
 });
