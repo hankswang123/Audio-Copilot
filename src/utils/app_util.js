@@ -3,12 +3,12 @@
 // to be used in the dropdown
 // The FIRST magzine in the list will be the default magzine
 export const magzines = [
+    "National_Geographic_Little_Kids_USA_-_September-October_2024",      
     "National_Geographic_Little_Kids_-_March_2023",
     "National_Geographic_Little_Kids_-_January_2022",
     "National_Geographic_Little_Kids_-_July_2023",
     "National_Geographic_Little_Kids_USA_-_January-February_2024",
-    "National_Geographic_Little_Kids_UK_-_Issue_23_2024",
-    "National_Geographic_Little_Kids_USA_-_September-October_2024",
+    "National_Geographic_Little_Kids_UK_-_Issue_23_2024",      
     //"National_Geographic_Little_Kids_USA_-_January-February_2025",
     //"National_Geographic_Little_Kids_UK_-_Issue_27_2025",
     //"After School, Traffic Safety, Animals, Toys",
@@ -69,6 +69,20 @@ async function fetchAudioScripts({magzine} = {magzine: magzines[0]}) {
     const response = await fetch(`./play/${magzine}/audio_scripts.txt`);
     const script = await response.text();
     return script;
+}
+
+export async function getFlashcards({magzine} = {magzine: magzines[0]}) {
+    try {
+        const response = await fetch(`./play/${magzine}/flashcards.txt`);
+        console.log('Fetching flashcards from:', `./play/${magzine}/flashcards.txt`, 'Response status:', response.status);
+        const data = await response.text();
+        console.log('Raw flashcards data:', data);
+        const flashcards = JSON.parse(data);
+        console.log('Fetched Fetched Fetched flashcards:', flashcards);
+        return flashcards;
+    } catch (error) {
+        console.error(error);
+    }
 }
 
 // Function to transform the script into the desired format to be used as audioCaptions

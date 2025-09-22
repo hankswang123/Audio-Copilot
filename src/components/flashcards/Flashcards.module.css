@@ -1,0 +1,89 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;          /* horizontal center (for column layout) */
+  justify-content: center;      /* vertical center */
+  width: 100%;
+  height: 100%;                 /* fill parent so vertical centering works */
+  margin: 0 auto;
+}
+
+.flashcard {
+  width: 520px;
+  height: 350px;
+  position: relative;
+  perspective: 1000px;
+  margin-bottom: 50px;
+  cursor: pointer;
+  margin-left: auto;             /* ensure centered if parent adds extra space */
+  margin-right: auto;  
+}
+
+.face {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  font-size: 2rem;
+  text-align: center;
+  transition: transform 0.6s;
+  backface-visibility: hidden;
+}
+
+.front {
+  composes: face;
+  background: #333;
+  color: #fff;
+}
+
+.back {
+  composes: face;
+  background: #fff;
+  color: #000;
+  transform: rotateY(180deg);
+  border: 1px solid #ccc;
+}
+
+.flipped .front {
+  transform: rotateY(180deg);
+}
+
+.flipped .back {
+  transform: rotateY(0deg);
+}
+
+.controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 220px;
+  margin-top: 10px;
+}
+
+.navButton {
+  background: none;
+  border: 2px solid #007bff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #007bff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.navButton:hover {
+  background: #007bff;
+  color: #fff;
+}
+
+.counter {
+  font-size: 1rem;
+}

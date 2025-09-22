@@ -265,7 +265,8 @@
     align-items: center; /* Align items vertically in the center */    
     position: fixed;
     //position: absolute;
-    bottom: 0; /* Adjust this value to position the button row at the bottom */
+    //bottom: 0; /* Adjust this value to position the button row at the bottom */
+    bottom: 0;
     width: 100%; /* Make it span the full width of the viewport */
     max-width: 100%;
     box-sizing: border-box;
@@ -279,6 +280,7 @@
     border-radius: 16px;
     margin: 1px;
     opacity: 1;
+    //opacity: 0.95;
   } 
 
   .button-row .button {
@@ -435,13 +437,15 @@
     text-align: center;
     //text-align: left;
     width: auto;
+    height: 13px;
 
     transition: font-size 0.3s ease, transform 0.3s ease;
     transform-origin: bottom; /* Ensure scaling happens from the bottom */    
   }
 
   .speed-control:hover {
-    font-size: 1.2em;
+    //font-size: 1.2em;
+    font-size: 1em;
     transform: scaleY(1.2); /* Scale the height upwards */
   }
 
@@ -689,6 +693,19 @@
     //new added
     width: 80%;
     height: 90%;    
+  }
+
+    /* Popup content styling */
+  .popup-content-flashcards {
+    position: relative;
+    background-color: #d60d0d;
+    padding: 0px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    //new added
+    width: 100%;
+    height: 100%;  
+    opacity: 1;  
   }
 
   /* Popup content styling */

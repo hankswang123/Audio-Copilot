@@ -28,15 +28,16 @@ type RealtimeClientItemType = ItemType | ZPItemType;
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
 import { WavRenderer } from '../utils/wav_renderer';
 
-import {AlignCenter, Key, Layout, Book, BookOpen, TrendingUp, X, Zap, Edit, Edit2, Play, Pause, Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight, Settings, Repeat, SkipBack, SkipForward, Globe, UserPlus, ZoomOut, ZoomIn, User, Volume } from 'react-feather';
+import {Layers, HelpCircle, AlignCenter, Key, Layout, Book, BookOpen, TrendingUp, X, Zap, Edit, Edit2, Play, Pause, Mic, MicOff, Plus, Minus, ArrowLeft, ArrowRight, Settings, Repeat, SkipBack, SkipForward, Globe, UserPlus, ZoomOut, ZoomIn, User, Volume } from 'react-feather';
 
 import { Document, Page } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 import './ConsolePage.scss';
-import { magzines, fetchKeywords, transformAudioScripts, buildInstructions, genKeywords, tts_voice } from '../utils/app_util.js';
+import { magzines, fetchKeywords, transformAudioScripts, buildInstructions, genKeywords, tts_voice, getFlashcards } from '../utils/app_util.js';
 import Chat, {openai} from '../components/chat/Chat';
 import CountdownTimer from '../components/countdowntimer/CountdownTimer';
+import Flashcards from "../components/flashcards/Flashcards";
 import PdfViewerWithIcons from '../components/pdf/PdfViewerWithIcons';
 import { Button } from '../components/button/Button';
 import SessionControls from "../components/webrtc/SessionControls";
@@ -182,8 +183,8 @@ export function ConsolePage() {
     new WavStreamPlayer({ sampleRate: 24000 })
   );
 
-  //const isRealtimeClient = true;
-  const isRealtimeClient = false;
+  const isRealtimeClient = true;
+  //const isRealtimeClient = false;
   const clientRef = useRef<ClientType>(
     isRealtimeClient ?
     new RealtimeClient(
@@ -293,6 +294,9 @@ export function ConsolePage() {
   const selectionStart = useRef({ x: 0, y: 0 });
   const selectionRef = useRef(null);
   const containerRefs = useRef({}); // 用于存储每个页面对的容器引用
+  
+  interface FlashcardItem { front: string; back: string; }
+  const [flashcards, setFlashcards] = useState<FlashcardItem[]>([]);
 
 // 修改初始状态，添加 pairIndex
   const [selectionBox, setSelectionBox] = useState({ 
@@ -621,8 +625,11 @@ export function ConsolePage() {
         const captions = await transformAudioScripts();
         setNewAudioCaptions(captions); 
 
-        const keywords = await genKeywords();
-        setNewKeywords(keywords);
+        if( res.keywordsExisting === 'true' )
+        {
+          setNewKeywords( await fetchKeywords({magzine: magzines[0]}) );      
+        }      
+        
       } else {
         setIsScriptExisting(false);
         setNewInstructions(basicInstructions);   
@@ -646,7 +653,16 @@ export function ConsolePage() {
       setNewInstructions(basicInstructions);   
 
       setNewAudioCaptions([]);
-    }   
+    } 
+    
+    if(res.flashcardsExisting === 'true'){
+      const flashcards = await getFlashcards({magzine: magzines[0]});
+      console.log('Flashcards Loaded:', flashcards);
+      setFlashcards(flashcards);
+    }else {
+      setFlashcards([]);
+    }     
+    
   };  
 
   // Initialize the keywords with the first magazine
@@ -674,31 +690,9 @@ export function ConsolePage() {
 
   }, [newInstructions]);      
 
-  // Initialize the keywords with the first magazine
-  /*
-  useEffect(() => {
-    const fetchNewKeywords = async () => {
-      const keywords = await fetchKeywords();
-      setNewKeywords(keywords); 
-    };
-
-    fetchNewKeywords(); // Call the async function
-  }, []);   */
-
   useEffect(() => {
     Keywords.current = newKeywords; // Sync ref with the updated state
   }, [newKeywords]);    
-
-  // Initialize the audio captions with the first magazine
-  /*
-  useEffect(() => {
-    const fetchAudioCaptions = async () => {
-      const captions = await transformAudioScripts();
-      setNewAudioCaptions(captions); 
-    };
-
-    fetchAudioCaptions(); // Call the async function
-  }, []); */
 
   useEffect(() => {
     audioCaptions.current = newAudioCaptions; // Sync ref with the updated state
@@ -783,8 +777,16 @@ export function ConsolePage() {
       setNewInstructions( basicInstructions );
       client.updateSession({ instructions: basicInstructions });      
 
-      setNewKeywords( {} );
+      setNewKeywords( {} );   
     }    
+
+    if( res.flashcardsExisting === 'true'){
+      const flashcards = await getFlashcards({magzine: newMagzine});
+      console.log('Flashcards Loaded:', flashcards);
+      setFlashcards(flashcards);
+    } else {
+      setFlashcards([]);
+    }
   };  
 
   // Some times isConnected could not reflect the actual connection status due to the delay of the state update
@@ -2363,6 +2365,7 @@ export function ConsolePage() {
     const popupOverlay = document.getElementById('popupOverlay');
     const videoFrame = document.getElementById('videoFrame');  
     const searchBox = document.getElementById('searchBox');  
+    const flashcardsContainer = document.getElementById('flashcardsContainer');
 
     const closeKeywords = document.getElementById('closeKeywords');
     const floatingKeywords = document.getElementById('floatingKeywords');
@@ -2373,6 +2376,9 @@ export function ConsolePage() {
       closeButton.addEventListener('click', () => {
         (videoFrame as HTMLIFrameElement).src = '';
         popupOverlay.style.display = 'none';
+        if(flashcardsContainer){
+          (flashcardsContainer as HTMLDivElement).style.display = 'none';
+        }
 
         (searchBox as HTMLInputElement).value = ''; // Clear the search box
       });
@@ -2619,6 +2625,30 @@ export function ConsolePage() {
 
   const getIsMuted = () => {return isMuted;};
 
+  const toggleFlashcards = () => {
+    const popupOverlay = document.getElementById('popupOverlay');
+    const flashcardsContainer = document.getElementById('flashcardsContainer');
+    const videoFrame = document.getElementById('videoFrame');
+    const imageFrame = document.getElementById('imageFrame');
+    const popupContent = document.getElementById('popupContent');
+    if (!popupOverlay || !flashcardsContainer) return;
+
+    const isVisible =
+      popupOverlay.style.display === 'flex' &&
+      flashcardsContainer.style.display === 'flex';
+    if (isVisible) {
+      flashcardsContainer.style.display = 'none';
+      popupOverlay.style.display = 'none';
+      return;
+    }
+    // Show flashcards; hide other media
+    (popupContent as HTMLIFrameElement).className = 'popup-content-flashcards';
+    flashcardsContainer.style.display = 'flex';
+    if (videoFrame) (videoFrame as HTMLIFrameElement).style.display = 'none';
+    if (imageFrame) (imageFrame as HTMLImageElement).style.display = 'none';
+    popupOverlay.style.display = 'flex';
+  };  
+  
   /*
    * Utility for search Videos by Youtube by addTool
    * it will be called back from Realtime API and a popup will be displayed
@@ -2647,6 +2677,12 @@ export function ConsolePage() {
           (videoFrame as HTMLIFrameElement).src = embedUrl;
           (videoFrame as HTMLIFrameElement).style.display = 'flex';
           (imageFrame as HTMLImageElement).style.display = 'none';
+
+          const flashcardsContainer = document.getElementById('flashcardsContainer');
+          if (flashcardsContainer) {
+            (flashcardsContainer as HTMLDivElement).style.display = 'none';
+          }          
+
           (popupContent as HTMLIFrameElement).className = 'popup-content-video';
           if (popupOverlay){
             popupOverlay.style.display = 'flex';
@@ -3822,6 +3858,17 @@ export function ConsolePage() {
       <div id="popupOverlay" className="popup-overlay">
         <div id="popupContent" className="popup-content-chat">
           <span id="closePopup" className="close-button"><X /></span>
+          {/* Show flashcards here */}
+          <div id="flashcardsContainer"
+               style={{
+                display: 'none',
+                width: '100%',
+                height: '100%',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: 'lightgrey'
+              }}> <Flashcards cards={flashcards} /></div>
           <iframe id="videoFrame" width="800" height="450" src="" allow="fullscreen" allowFullScreen style={{display: 'none'}}></iframe>
           <img id="imageFrame" src="" alt="Image"
                 onDoubleClick={() => {
@@ -3850,7 +3897,7 @@ export function ConsolePage() {
           <li id='readAloudLi'>Read Aloud/朗读</li>
           <li id='translateLi'>Translate/翻译</li>
           <li id='explainLi'>Explain/解释一下</li>
-          <li id='searchVideosLi'>Search Videos/相关视频</li>
+          <li id='searchVideosLi'>Youtube相关视频推荐</li>
           <li style={{display: 'none'}}>Search the web</li>
           <li id='talkAboutSelection'>Deep Dive/深入了解</li>
           <li>
@@ -4372,8 +4419,11 @@ export function ConsolePage() {
               color: playbackVolume === 1.0 ? '#fff' : '#000', // Adjust text color for contrast
               borderRadius: '0.3125em',
             }}    onClick={(e) => handleVolumeControlClick(e, 1.0)}>Louder</div>   
-
             <div><span className="separator">|</span></div>
+            <div title='Show Flashcards'><Layers color='blue' style={{ width: '17px', height: '17px' }} onClick={toggleFlashcards} /></div>
+            <div><span className="separator">|</span></div>
+            <div title='Have a Quiz'><HelpCircle color='red' style={{ width: '17px', height: '17px' }} /></div>            
+            <div><span className="separator" style={{userSelect: 'none', display: hasKeywords ? 'flex' : 'none' }}>|</span></div>
             <div className="tooltip-container" style={{userSelect: 'none', display: hasKeywords ? 'flex' : 'none' }}>
               <div title={keyword === '' ? 'Select a Keyword to Dive in' : '' }><BookOpen color='blue' style={{ width: '17px', height: '17px' }} /></div>
               <div className="tooltip" style={{backgroundColor: 'rgb(255, 255, 255, 1)', width: 'auto', height: 'auto'}}>
@@ -4404,8 +4454,7 @@ export function ConsolePage() {
               backgroundColor: keyword !== '' ? '#666' : '#ccc', // Darker if active
               color: keyword !== '' ? '#fff' : '#000', // Adjust text color for contrast
               borderRadius: '0.3125em',
-            }}    onClick={(e) => handleClearKeyword(e)} title='Clear Keyword Play'>{keyword === '' ? 'Select a Keyword to Dive in' : keyword }</div> 
-
+            }}    onClick={(e) => handleClearKeyword(e)} title='Clear Keyword Play Looping'>{keyword === '' ? 'Select a Keyword to Dive in' : keyword }</div> 
             {/* Test: Place the search box for video at the right-down of progress bar area */}  
             <div style={{position: 'fixed', transform:'translateX(41.5em)', bottom: '1px'}}>
               <input id="searchBox" 

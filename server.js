@@ -216,18 +216,19 @@ app.get("/api/audio/check", async (req, res) => {
         const audioPath = path.join(dirPath, `${magzine}.wav`);
         const scriptPath = path.join(dirPath, 'audio_scripts.txt');
         const keywordsPath = path.join(dirPath, 'keywords.txt');
+        const flashcardsPath = path.join(dirPath, 'flashcards.txt');
 
         // Check if the audio file already exists
-        if (fs.existsSync(audioPath)&&fs.existsSync(scriptPath)&&fs.existsSync(keywordsPath)) {
-            res.json({audioExisting: 'true', scriptExisting: 'true', keywordsExisting: 'true'});
+        if (fs.existsSync(audioPath)&&fs.existsSync(scriptPath)&&fs.existsSync(keywordsPath)&&fs.existsSync(flashcardsPath)) {
+            res.json({audioExisting: 'true', scriptExisting: 'true', keywordsExisting: 'true', flashcardsExisting: 'true'});
         } else if(fs.existsSync(audioPath)&&fs.existsSync(scriptPath)){
-            res.json({audioExisting: 'true', scriptExisting: 'true', keywordsExisting: 'false'});
+            res.json({audioExisting: 'true', scriptExisting: 'true', keywordsExisting: 'false', flashcardsExisting: 'false'});
         }
         else if(fs.existsSync(audioPath)&&fs.existsSync(keywordsPath)){ 
-            res.json({audioExisting: 'true', scriptExisting: 'false', keywordsExisting: 'true'});   
+            res.json({audioExisting: 'true', scriptExisting: 'false', keywordsExisting: 'true', flashcardsExisting: 'false'});   
         }
         else if(fs.existsSync(audioPath)){ 
-            res.json({audioExisting: 'true', scriptExisting: 'false', keywordsExisting: 'false'});                        
+            res.json({audioExisting: 'true', scriptExisting: 'false', keywordsExisting: 'false', flashcardsExisting: 'false'});                        
         } else{res.json({audioExisting: 'false'});}
 
     } catch(error) {
