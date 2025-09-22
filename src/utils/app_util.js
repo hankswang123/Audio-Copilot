@@ -3,7 +3,8 @@
 // to be used in the dropdown
 // The FIRST magzine in the list will be the default magzine
 export const magzines = [
-    "National_Geographic_Little_Kids_USA_-_September-October_2024",      
+    "National_Geographic_Little_Kids_USA_-_September-October_2024",   
+    "National_Geographic_Little_Kids_USA_-_November-December_2024",
     "National_Geographic_Little_Kids_-_March_2023",
     "National_Geographic_Little_Kids_-_January_2022",
     "National_Geographic_Little_Kids_-_July_2023",
@@ -17,7 +18,6 @@ export const magzines = [
     "My morning",
     "My room",
     "National_Geographic_Little_Kids_-_September_2022"
-    //"National_Geographic_Little_Kids_USA_-_November-December_2024"
     //"ngl_sep_lite"
 ];
 

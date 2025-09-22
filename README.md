@@ -21,14 +21,16 @@ Audio Copilot enables the interaction with content during playback on-going. It 
 
 ## An Education Scenario which Audio Copilot could help 
 ### Whole process
-- Step 1 - Preapre the PDF file from [National Geographic Little Kids](https://magazinelib.com/?s=national+geographic+little+kids) or any other PDF files - mandatory
-- Step 2 - Generate the podcast by uploading PDF to [NotebookLM](https://notebooklm.google.com/)
+- Step 1 - Preapre the PDF file from [National Geographic Little Kids](https://magazinelib.com/?s=national+geographic+little+kids) or any other PDF files - **Mandatory**
+- Step 2 - Generate the **podcast**(Audio overview for PDF file) by uploading PDF to [NotebookLM](https://notebooklm.google.com/)
     - Prompt example: Use very simple and interesting English words, the target audence is for grade 1 student. Tone should be supportive and encouraging. Also repeat some keywords letter by letter according to you judgement.
-- Step 3 - Generate the scripts by uploading podcast to [Tongyi->Efficiency](https://tongyi.aliyun.com/efficiency)， [Fireflies](https://app.fireflies.ai/) or [Google AI Studio](https://aistudio.google.com/prompts/new_chat)
+- Step 3 - Generate the **Audio Scripts** by uploading podcast(audio file) to [Tongyi->Efficiency](https://tongyi.aliyun.com/efficiency)， [Fireflies](https://app.fireflies.ai/) or [Google AI Studio](https://aistudio.google.com/prompts/new_chat) - Optional
     - Tongyi Efficiency supports editting the transribed scripts dynamically
     - **Tongyi now support export the scripts generated** and exported scripts could be used by default without any modification
-- Step 4 - User could engage an realtime dicussion by Audio Copilot during listening podcast and reading the magzine.
-- Step 5 - Additional features: analyze selected screenshot, word card...
+- Step 4 - Prepare are the **Keywords** based Audio Scripts - Optional
+- Step 4 - Generate the **Flashcards content** by uploading to Tongyi - Optional
+- Step 5 - User could engage an realtime dicussion by Audio Copilot during listening podcast and reading the magzine.
+- Step 6 - Additional features: analyze selected screenshot, word card...
 
 ## API Key required
 - [OpenAI API Key](https://platform.openai.com/api-keys) - for Realtime API calling

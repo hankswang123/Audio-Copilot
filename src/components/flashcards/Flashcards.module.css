@@ -17,6 +17,42 @@
   cursor: pointer;
   margin-left: auto;             /* ensure centered if parent adds extra space */
   margin-right: auto;  
+
+  position: relative;
+}
+
+.voiceButton {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+  transition: background .2s, transform .15s;
+}
+
+.voiceButton:hover {
+  background: rgba(0,0,0,0.75);
+}
+
+.voiceButton:active {
+  transform: scale(.9);
+}
+
+.voiceButton.speaking {
+  background: #1d4ed8;
+}
+
+.voiceButton.speaking:hover {
+  background: #1e40af;
 }
 
 .face {

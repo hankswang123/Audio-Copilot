@@ -3868,7 +3868,7 @@ export function ConsolePage() {
                 justifyContent: 'center',
                 alignItems: 'center',
                 backgroundColor: 'lightgrey'
-              }}> <Flashcards cards={flashcards} /></div>
+              }}> <Flashcards cards={flashcards} realtimeClient={clientRef.current} /></div>
           <iframe id="videoFrame" width="800" height="450" src="" allow="fullscreen" allowFullScreen style={{display: 'none'}}></iframe>
           <img id="imageFrame" src="" alt="Image"
                 onDoubleClick={() => {
