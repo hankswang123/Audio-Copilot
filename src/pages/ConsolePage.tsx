@@ -294,6 +294,9 @@ export function ConsolePage() {
   const selectionStart = useRef({ x: 0, y: 0 });
   const selectionRef = useRef(null);
   const containerRefs = useRef({}); // 用于存储每个页面对的容器引用
+
+  const [chatModel, setChatModel] = useState('gpt-4o-mini-realtime-preview-2024-12-17');  
+  const chatModelRef = useRef(chatModel);  
   
   interface FlashcardItem { front: string; back: string; }
   const [flashcards, setFlashcards] = useState<FlashcardItem[]>([]);
@@ -370,11 +373,10 @@ export function ConsolePage() {
     }
   }, [renderedPages])  
 
-  // screenshot menu poupup after selection mouseup
+  // Screenshot Menu Popup after selection Mouseup
   const showScreenshotMenu = (box) => {
     const menu = document.createElement('div');
     menu.style.position = 'fixed';
-
     menu.style.left = `${box.x + box.width - 6}px`;  // 改为选区右边
     menu.style.top = `${box.y + box.height + 1}px`;  // 保持在选区底部  
     menu.style.backgroundColor = 'white';
@@ -383,9 +385,6 @@ export function ConsolePage() {
     menu.style.padding = '6px';
     menu.style.zIndex = '1001';
     menu.style.transform = 'translate(-100%, 0)'; // 向左偏移菜单自身的宽度  
-
-
-    // 添加一些边距
     menu.style.marginLeft = '10px';  // 与选区保持一些距离
     menu.style.marginTop = '5px';    // 与选区底部保持一些距离  
 
@@ -436,6 +435,47 @@ export function ConsolePage() {
       document.removeEventListener('click', closeMenu);    
     };    
 
+    let snapShotURL = '';
+    // Get Snapshot Image URL using html2canvas
+    const getScreenshotURL = async () => {
+      
+      const container = containerRefs.current[`pair_${selectionBox.pairIndex}`].current;
+      if (!container) return;
+
+      // 获取选区元素
+      const selectionElement = selectionRef.current;
+      if (selectionElement) {
+
+        // 获取容器的位置信息
+        const containerRect = container.getBoundingClientRect();
+        
+        // 计算选区相对于容器的位置
+        const relativeX = selectionBox.x - containerRect.left;
+        const relativeY = selectionBox.y - containerRect.top;      
+
+        // 使用相对坐标进行截图
+        const canvas = await html2canvas(container, {
+          x: relativeX + 2,
+          y: relativeY + 2,
+          width: selectionBox.width - 4,
+          height: selectionBox.height - 4,
+          backgroundColor: null,
+          // 添加这些选项以提高精确度
+          scale: window.devicePixelRatio, // 使用设备像素比
+          useCORS: true,
+          logging: true,
+          windowWidth: containerRect.width,
+          windowHeight: containerRect.height,
+        });     
+
+        const imgURL = canvas.toDataURL('image/png');      
+        snapShotURL = imgURL;
+        return imgURL;
+      }            
+    };
+
+    //getScreenshotURL();
+
     const imgDescribe = async () => {
 
       startLoading(); // 开始加载动画
@@ -445,9 +485,6 @@ export function ConsolePage() {
           try {
             const container = containerRefs.current[`pair_${selectionBox.pairIndex}`].current;
             if (!container) return;
-
-            //startLoading(); // 开始加载动画
-            //await Promise.resolve();
 
             // 获取选区元素
             const selectionElement = selectionRef.current;
@@ -475,58 +512,38 @@ export function ConsolePage() {
                 windowHeight: containerRect.height,
               });     
 
-              const imgURL = canvas.toDataURL('image/png');
+              //const imgURL = canvas.toDataURL('image/png');
+              const imgURL = await getScreenshotURL();
               console.log(imgURL);  
               await chatRef.current.updateScreenshot(imgURL);
-              //skip calling gpt-4o describe the image
-              //const response = await analyzeImage(imgURL);
 
               stopLoading(); // 停止加载动画    
 
               // Read Aloud the image description from LLM
               const client = clientRef.current;
               if(client.isConnected()){
-                /* skip calling gpt-4o describe the image
+
+                if(chatModelRef.current === 'gpt-realtime'){
                   client.sendUserMessageContent([
-                  {
-                    type: `input_text`,
-                    text: `Read Aloud: ${response}. 
-                    The output should follow the format:
-                    <b>Screenshot Description</b>:                      
-                    - {Each sentence of the response}`,
-                  },
-                ]);  */
-
-                /* Send image to realtime API directly. 
-                due to update: https://openai.com/index/introducing-gpt-realtime/
-                with 'image input' allowed 
-                Model has to be set as 'gpt-realtime' to use this feature.
-                */
-               /* for debugging purpose
-                console.log('relative X Position', relativeX);
-                console.log('relative Y Position', relativeY);
-                console.log('Selection Box Width', selectionBox.width);
-                console.log('Selection Box Height', selectionBox.height);
-                console.log('Viewport X Position', containerRect.scrollX);
-                console.log('Viewport Y Position', containerRect.scrollY);
-                console.log('Viewport Width', containerRect.width);
-                console.log('Viewport Height', containerRect.height); */
-
-               /*
-                const base64Image = await captureScreenBase64();
-                client.sendUserMessageContent([
-                {
-                  type: `input_image`,
-                  image_url: base64Image,
-                } as any, // 'as any' used to bypass TypeScript checks
-                ]);       // This shows how to send msg type not supported by default   
-                */
-                client.sendUserMessageContent([
-                {
-                  type: `input_image`,
-                  image_url: imgURL,
-                } as any, // 'as any' used to bypass TypeScript checks
-                ]);       // This shows how to send msg type not supported by default                   
+                    {
+                      type: `input_image`,
+                      image_url: imgURL,
+                    } as any, // 'as any' used to bypass TypeScript checks
+                  ]);         // This shows how to send msg type not supported by default
+                }else{
+                  const response = await analyzeImage(imgURL);
+                  /* calling gpt-4o describe the image and then call realtime-mini to read aloud */
+                  client.sendUserMessageContent([
+                    {
+                      type: `input_text`,
+                      text: `Read Aloud: ${response}. 
+                      The output should follow the format:
+                      <b>Screenshot Description</b>:                      
+                      - {Each sentence of the response}`,
+                    },
+                  ]);  
+                }
+                   
               }
 
               // 下载截图
@@ -542,7 +559,7 @@ export function ConsolePage() {
     };
 
     const button = document.createElement('button');
-    button.textContent = 'Talk about snapshot';
+    button.textContent = 'What can you see...';
     button.onclick = imgDescribe;
     button.style.width = '140px'; 
     button.style.padding = '4px 8px';
@@ -698,8 +715,25 @@ export function ConsolePage() {
     audioCaptions.current = newAudioCaptions; // Sync ref with the updated state
   }, [newAudioCaptions]);  
 
+  useEffect(() => {
+    chatModelRef.current = chatModel; // Sync ref with the updated state
+  }, [chatModel]);   
+
   const handleModelChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newModel = event.target.value;
+  
+    if( newModel === 'GPT-Realtime' || newModel === 'GPT-Realtime-Mini' ){
+
+      if(newModel === 'GPT-Realtime'){
+        setChatModel('gpt-realtime');
+      }else{
+        setChatModel('gpt-4o-mini-realtime-preview-2024-12-17');
+      }      
+
+      disConnnectRealtimeAPI();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      connnectRealtimeAPI();      
+    }
 
     await chatRef.current.updateChatModel(newModel);
   };
@@ -2962,10 +2996,11 @@ export function ConsolePage() {
         if (client.isConnected()) {
           throw new Error(`Already connected, use .disconnect() first`);
         }
-        //await client.realtime.connect({ model: 'gpt-4o-realtime-preview-2024-12-17' });
-        //await client.realtime.connect({ model: 'gpt-4o-mini-realtime-preview-2024-12-17' });
-        //test with the latest GA version: gpt-realtime
-        await client.realtime.connect({ model: 'gpt-realtime' });
+
+        // use mini model by default for saving cost: 'gpt-4o-mini-realtime-preview-2024-12-17'
+        // select latest GA Model: 'gpt-realtime' for better quality
+        await client.realtime.connect({ model: chatModelRef.current });
+
         client.updateSession();            
         /* End of inside logic client.connect() */
 
@@ -4574,14 +4609,17 @@ export function ConsolePage() {
               </div> 
               <div className="speed-controls">
                 <div title='Chat Models'><Edit2 style={{ width: '13px', height: '13px' }} />:</div>
-                <select id="Model" name="Model" onChange={handleModelChange} style={{height: '20px', width:'90%'}}>            
-                  <option key={1} value={'GPT-Realtime'}>
-                      {'GPT-Realtime'}
-                  </option>                  
-                  <option key={2} value={'GPT-4o'}>
+                <select id="Model" name="Model" onChange={handleModelChange} style={{height: '20px', width:'90%'}}>   
+                  <option key={1} value={'GPT-Realtime-Mini'}>
+                      {'GPT-Realtime-Mini - Cheapest'}
+                  </option>                              
+                  <option key={2} value={'GPT-Realtime'}>
+                      {'GPT-Realtime - Most Capable'}
+                  </option>                                    
+                  <option key={3} value={'GPT-4o'}>
                       {'GPT-4o'}
                   </option>
-                  <option key={3} value={'DeepSeek'}>
+                  <option key={4} value={'DeepSeek'}>
                       {'DeepSeek'}
                   </option>                  
                 </select>                          
