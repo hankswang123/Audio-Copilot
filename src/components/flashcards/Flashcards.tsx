@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import styles from './Flashcards.module.css';
-import { Volume2, Square } from 'react-feather';
+import { Volume2, Square, Globe } from 'react-feather';
 
 import { RealtimeClient } from '@openai/realtime-api-beta';
 import { ZPRealtimeClient } from '../../lib/zhipuRealtime/client.js';
@@ -10,6 +10,8 @@ type ClientType = RealtimeClient | ZPRealtimeClient;
 interface Card {
   front: string;
   back: string;
+  front_translation?: string;   // added
+  back_translation?: string;    // added  
 }
 interface FlashcardsProps {
   cards?: Card[];
@@ -23,8 +25,18 @@ export default function Flashcards({ cards, realtimeClient }: FlashcardsProps) {
   const data: Card[] = cards && cards.length
     ? cards
     : [
-        { front: "Flashcard 1: How is the name 'markhor' pronounced?", back: "MAR-kor." },
-        { front: "Flashcard 2: How is the name 'oryx' pronounced?", back: "OR-iks." },
+        { 
+          front: "Flashcard 1: How is the name 'markhor' pronounced?", 
+          back: "MAR-kor.",
+          front_translation: "卡片1：'markhor' 怎么读？",
+          back_translation: "发音：MAR-kor" 
+        },
+        { 
+          front: "Flashcard 2: How is the name 'oryx' pronounced?", 
+          back: "OR-iks.", 
+          front_translation: "卡片2：'oryx' 怎么读？", 
+          back_translation: "发音：OR-iks" 
+        },
       ];
 
   const [index, setIndex] = useState(0);
@@ -33,6 +45,9 @@ export default function Flashcards({ cards, realtimeClient }: FlashcardsProps) {
   
   const clickTimeoutRef = useRef<number | null>(null);
   const hadSelectionAtMouseDownRef = useRef(false);
+
+  const [showTranslation, setShowTranslation] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false); // keeps Square icon logic consistent  
 
   const cancelSpeak = useCallback(() => {
     try {
@@ -46,6 +61,30 @@ export default function Flashcards({ cards, realtimeClient }: FlashcardsProps) {
   }, [cancelSpeak]);
 
   const card = React.useMemo(() => data[index], [data, index]);
+
+  // Current side translation text (already prepared in Card[])
+  const currentSideTranslation = React.useMemo(() => {
+    return flipped ? (card.back_translation || '') : (card.front_translation || '');
+  }, [flipped, card]);
+
+  const handleTranslateToggle = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    // If translation text is preloaded, just toggle; keep a brief async frame if you want Square flash
+    if (!currentSideTranslation) {
+      // No translation available; optionally you could disable the button instead.
+      return;
+    }
+    if (!showTranslation) {
+      // Simulate short loading phase only if you want Square to appear
+      setIsTranslating(true);
+      requestAnimationFrame(() => {
+        setShowTranslation(true);
+        setIsTranslating(false);
+      });
+    } else {
+      setShowTranslation(false);
+    }
+  }, [showTranslation, currentSideTranslation]);  
 
   /* SpeechSynthesisUtterance quality suck, use Realtime API instead */
   /*
@@ -198,6 +237,23 @@ export default function Flashcards({ cards, realtimeClient }: FlashcardsProps) {
         >
           {isSpeaking ? <Square size={18} /> : <Volume2 size={18} />}
         </button>
+
+        {/* Translate Button (uses Globe; Square when "translating") */}
+        <button
+          type="button"
+          className={styles.translateButton}
+            aria-label={showTranslation ? 'Hide translation' : 'Show translation'}
+          onClick={handleTranslateToggle}
+          disabled={!currentSideTranslation}
+        >
+          {(isTranslating || showTranslation) ? <Square size={16} /> : <Globe size={16} />}
+        </button>
+
+        {showTranslation && currentSideTranslation && (
+          <div className={styles.translationBadge}>
+            {currentSideTranslation}
+          </div>
+        )}
 
       </div>
       <div className={styles.controls}>

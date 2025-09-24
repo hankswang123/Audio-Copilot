@@ -248,6 +248,8 @@ export function ConsolePage() {
   const [totalDuration, setTotalDuration] = useState(0); // State to store total duration
   const [currentTime, setCurrentTime] = useState(0); // State to store current play time
   const [isCaptionVisible, setIsCaptionVisible] = useState(false); // State to manage caption visibility
+  const [showTranslation, setShowTranslation] = useState(false);   
+  const showTranslationRef = useRef(showTranslation);  
   const [isMuteBtnDisabled, setIsMuteBtnDisabled] = useState(false);
   const [isCloseRightPanelDisabled, setIsCloseRightPanelDisabled] = useState(true);
   const [isConnectionError, setIsConnectionError] = useState(false);
@@ -1838,6 +1840,15 @@ export function ConsolePage() {
     }
   }  
 
+
+  useEffect(() => {
+    showTranslationRef.current = showTranslation; // Sync ref with the updated state
+  }, [showTranslation]);     
+
+  const showTranslateCurrentCaption = () => {
+    setShowTranslation(!showTranslation);
+  }  
+
   //Update the progress bar and current time when the audio is playing
   useEffect(() => {
     const audio = audioRef.current;
@@ -1888,6 +1899,7 @@ export function ConsolePage() {
       if (currentCaptionIndex !== -1) {
         const currentCaption = audioCaptions.current[currentCaptionIndex];
         const nextCaption = audioCaptions.current[currentCaptionIndex + 1];
+        const translationCaption = audioCaptions.current[currentCaptionIndex - 1];
         const wordsWithTiming = splitCaptionIntoWords(currentCaption, nextCaption?.time);
     
         // Find the active word
@@ -1905,9 +1917,13 @@ export function ConsolePage() {
                 ? ` <span style="border-radius: 4px; color: #00FFFF; display: inline-block; margin: 0 1px;">${word.word}</span> `
                 : ` <span style="display: inline; margin: 0 1px;">${word.word}</span> `
             )
-            .join(' ');
-    
-          setCurrentCaption(highlightedCaption); // Update the UI
+            .join(' ');           
+
+          if(showTranslationRef.current){
+            setCurrentCaption(highlightedCaption + '<br />' + translationCaption.text); // Update the UI with translation            
+          } else {
+            setCurrentCaption(highlightedCaption); // Update the UI without translation
+          }
         }
       }
     };   
@@ -3973,7 +3989,7 @@ export function ConsolePage() {
         <li onClick={repeatCurrent}id='repeatCurrentLi'  title='Repeat current caption'><Repeat style={{ width: '13px', height: '13px' }} /></li>
         <li onClick={repeatPrevious} id='repeatPreviousLi'><SkipBack style={{ width: '13px', height: '13px' }} /></li>
         <li onClick={repeatForward} id='repeatForwardLi'><SkipForward style={{ width: '13px', height: '13px' }} /></li>
-        <li onClick={translateCurrentCaption} title='Translation'><Globe style={{ width: '13px', height: '13px' }} /></li>
+        <li onClick={showTranslateCurrentCaption} title='Translation'><Globe style={{ width: '13px', height: '13px' }} /></li>
         <li onClick={() => adjustCaptionFontSize(+0.1)}><ZoomIn style={{ width: '13px', height: '13px' }} /></li>
         <li onClick={() => adjustCaptionFontSize(-0.1)}><ZoomOut style={{ width: '13px', height: '13px' }} /></li>
       </ul>
