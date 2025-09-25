@@ -1,0 +1,16 @@
+help: This file stores Keywords of pdf file and audio as following json format:
+128 is the start timestamp of the keyword in audio
+164 is the end timestamp of the keyword in audio
+12 is the start page of the pdf file
+----------------------------------------------------------------------------------------
+{
+    "Snowshoe Hare": [128, 164, 12],
+    "Walrus": [166, 218, 18],
+    "Venus": [220, 247, 20],
+    "Mandrill": [252, 306, 24],
+    "Mallard Ducks": [314, 360, 27],
+    "Purple Sea Urchin": [356, 393, 34],
+    "Penguin": [395, 438, 38],
+    "Puffin": [440, 476, 42],
+    "Polar Bear": [478, 525, 48]
+  }
